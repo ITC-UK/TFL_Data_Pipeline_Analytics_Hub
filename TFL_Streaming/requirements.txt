@@ -1,49 +1,12 @@
-# -----------------------
-# Core Python packages
-# -----------------------
 numpy==1.26.2
 pandas==2.2.0
-scipy==1.12.1
 
-# -----------------------
-# Data processing / ETL
-# -----------------------
-pyarrow==12.0.1
-fastparquet==2024.11.0
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9   # PostgreSQL driver
-
-# -----------------------
-# Streaming & Big Data
-# -----------------------
 pyspark==4.3.2
 kafka-python==2.1.0
-apache-beam==2.48.0
 
-# -----------------------
-# Analytics / Spark profiling
-# -----------------------
 pyspark-pandas==3.3.0       # pandas API on Spark
-spark-nlp==5.0.0            # if NLP analytics needed
 pyspark-test==0.4.0         # utilities for Spark testing
-sweetviz==3.3.4             # exploratory data analysis
 pandas-profiling==3.4.1     # profiling reports
 
-# -----------------------
-# Testing
-# -----------------------
 pytest==8.4.0
-pytest-cov==4.1.0
-
-# -----------------------
-# Jupyter / Notebooks
-# -----------------------
-jupyterlab==4.3.2
-ipython==8.16.2
-
-# -----------------------
-# Utilities
-# -----------------------
-python-dotenv==1.1.1
-loguru==0.7.0
 requests==2.31.0
