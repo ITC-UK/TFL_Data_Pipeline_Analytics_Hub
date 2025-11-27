@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
@@ -89,10 +90,9 @@ def run_schema_validation(batch_df, batch_id):
     print("Deequ results: {}".format(status))
 
     if status != "Success":
-        raise Exception("Schema validation failed in batch {} — data does not match schema.".format(batch_id))
+        raise Exception("Schema validation failed in batch {} - data does not match schema.".format(batch_id))
 
     print("Batch schema validated successfully")
-
 
 def write_to_incoming(batch_df, batch_id):
     exploded = batch_df.select(explode(col("data")).alias("event"))
