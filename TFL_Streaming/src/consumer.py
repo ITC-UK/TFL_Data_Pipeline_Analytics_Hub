@@ -2,14 +2,11 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-from pydeequ.checks import Check, CheckLevel
-from pydeequ.verification import VerificationSuite
 
-# Create Spark session with Deequ jar
+# Create Spark session
 spark = (
     SparkSession.builder
     .appName("UK_TFL_STREAMING_CONSUMER_DEDUPED")
-    .config("spark.jars.packages", "com.amazon.deequ:deequ:1.2.2-spark-3.3")
     .getOrCreate()
 )
 
@@ -57,59 +54,26 @@ kafka_df = (
 raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
 
 # Parse JSON safely with from_json
-parsed = raw_json_df.withColumn(
-    "data", from_json(col("json_value"), tfl_schema)
-)
+parsed = raw_json_df.withColumn("data", from_json(col("json_value"), tfl_schema))
 
 
-def run_schema_validation(batch_df, batch_id):
-    print("Running Deequ validation on batch {}".format(batch_id))
-
+def process_batch(batch_df, batch_id):
+    # Filter out rows where JSON parsing failed
     valid_rows_df = batch_df.filter(col("data").isNotNull())
 
-    if valid_rows_df.count() == 0:
-        raise Exception("JSON parsing failed. Incoming data does not match schema.")
-
+    # Explode the array to get individual events
     exploded = valid_rows_df.select(explode(col("data")).alias("event"))
     df = exploded.select("event.*")
 
-    check = (Check(spark, CheckLevel.Error, "schemacheck")
-             .isComplete("id")
-             .isComplete("naptanId")
-             .isComplete("stationName")
-             .isComplete("lineId")
-             .isComplete("expectedArrival")
-             .isInt("operationType")
-             .isInt("timeToStation")
-             .isContainedIn("modeName", ["tube"])
-             )
-
-    results = VerificationSuite(spark).onData(df).addCheck(check).run()
-    status = results.checkResults["schemacheck"].status
-
-    print("Deequ results: {}".format(status))
-
-    if status != "Success":
-        raise Exception("Schema validation failed in batch {} - data does not match schema.".format(batch_id))
-
-    print("Batch schema validated successfully")
-
-def write_to_incoming(batch_df, batch_id):
-    exploded = batch_df.select(explode(col("data")).alias("event"))
-    df = exploded.select("event.*")
-
-    # Append mode for streaming safe writes
+    # Write in append mode for streaming safety
     df.write.mode("append").parquet(incoming_path)
-    print("Wrote validated batch {} to incoming parquet".format(batch_id))
+    print("Wrote batch {batch_id} to incoming parquet".format(batch_id=batch_id))
 
 
-# Apply validation and write for each micro-batch
+# Apply foreachBatch for proper streaming writes
 query = (
     parsed.writeStream
-    .foreachBatch(lambda batch_df, batch_id: (
-        run_schema_validation(batch_df, batch_id),
-        write_to_incoming(batch_df, batch_id)
-    ))
+    .foreachBatch(process_batch)
     .option("checkpointLocation", checkpoint_path)
     .start()
 )
