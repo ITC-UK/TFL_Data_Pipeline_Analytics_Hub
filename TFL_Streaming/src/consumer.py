@@ -65,9 +65,18 @@ def process_batch(batch_df, batch_id):
     exploded = valid_rows_df.select(explode(col("data")).alias("event"))
     df = exploded.select("event.*")
 
-    # Write in append mode for streaming safety
+    # 👉 Print schema and sample data here
+    print("\n=== SCHEMA FOR BATCH {} ===".format(batch_id))
+    df.printSchema()
+
+    print("\n=== SAMPLE ROWS FOR BATCH {} ===".format(batch_id))
+    df.show(5, truncate=False)
+
+    # Write in append mode
     df.write.mode("append").parquet(incoming_path)
-    print("Wrote batch {batch_id} to incoming parquet".format(batch_id=batch_id))
+
+    print("Wrote batch {} to incoming parquet".format(batch_id))
+
 
 
 # Apply foreachBatch for proper streaming writes
