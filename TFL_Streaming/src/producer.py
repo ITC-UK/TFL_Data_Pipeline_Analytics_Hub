@@ -34,7 +34,7 @@ while True:
 
             producer.send(topic, value=event)
 
-        print(f"[SENT] {line_name} updates")
+        print("[SENT] {line_name} updates".format(line_name=line_name))
 
     producer.flush()
     print("Sleeping 30 seconds...\n")
