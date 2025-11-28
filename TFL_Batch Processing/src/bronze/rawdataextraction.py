@@ -6,12 +6,12 @@ from datetime import datetime
 
 # TfL API URLs
 urls = {
-    "Piccadilly": "https://api.tfl.gov.uk/Line/Piccadilly/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043",
-    "Northern": "https://api.tfl.gov.uk/Line/Northern/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043",
-    "Central": "https://api.tfl.gov.uk/Line/Central/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043",
-    "Bakerloo": "https://api.tfl.gov.uk/Line/Bakerloo/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043",
-    "Metropolitan": "https://api.tfl.gov.uk/Line/Metropolitan/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043",
-    "Victoria": "https://api.tfl.gov.uk/Line/Victoria/Arrivals?app_id=92293faa428041caad3dd647d39753a0&app_key=ba72936a3db54b4ba5792dc8f7acc043"
+    "Piccadilly": "https://api.tfl.gov.uk/Line/Piccadilly/Arrivals",
+    "Northern": "https://api.tfl.gov.uk/Line/Northern/Arrivals",
+    "Central": "https://api.tfl.gov.uk/Line/Central/Arrivals",
+    "Bakerloo": "https://api.tfl.gov.uk/Line/Bakerloo/Arrivals",
+    "Metropolitan": "https://api.tfl.gov.uk/Line/Metropolitan/Arrivals",
+    "Victoria": "https://api.tfl.gov.uk/Line/Victoria/Arrivals"
 }
 
 # Path of this file → .../TFL_Batch Processing/src/bronze/rawdataextraction.py
