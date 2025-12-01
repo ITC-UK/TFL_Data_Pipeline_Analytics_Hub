@@ -4,7 +4,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
 def get_tfl_schema():
-    """Return the Spark schema for TFL API data, with timestamps as STRING."""
+    """Return the Spark schema for TFL API data."""
     return ArrayType(StructType([
         StructField("id", StringType()),
         StructField("operationType", IntegerType()),
@@ -18,12 +18,12 @@ def get_tfl_schema():
         StructField("bearing", StringType()),
         StructField("destinationNaptanId", StringType()),
         StructField("destinationName", StringType()),
-        StructField("timestamp", StringType()),           # Keep as string initially
+        StructField("timestamp", StringType()),
         StructField("timeToStation", IntegerType()),
         StructField("currentLocation", StringType()),
         StructField("towards", StringType()),
-        StructField("expectedArrival", StringType()),     # Keep as string initially
-        StructField("timeToLive", StringType()),          # Keep as string initially
+        StructField("expectedArrival", StringType()),
+        StructField("timeToLive", StringType()),
         StructField("modeName", StringType())
     ]))
 
@@ -40,22 +40,17 @@ def explode_events(df):
     exploded = df.select(explode(col("data")).alias("event"))
     return exploded.select("event.*")
 
-def convert_timestamps(df):
-    """Convert timestamp strings to TimestampType columns."""
-    return df.withColumn("timestamp", to_timestamp("timestamp")) \
-             .withColumn("expectedArrival", to_timestamp("expectedArrival")) \
-             .withColumn("timeToLive", to_timestamp("timeToLive"))
-
 def write_output(df, path):
     """Write DataFrame to Parquet in append mode."""
     df.write.mode("append").parquet(path)
 
 def process_batch(batch_df, batch_id, output_path):
-    """Inside foreachBatch, just write the batch as-is."""
-    batch_df.printSchema()
-    batch_df.show(5, truncate=False)
-    write_output(batch_df, output_path)
-
+    """Process each micro-batch: validate, explode, show, and write."""
+    valid = filter_valid(batch_df)
+    events_df = explode_events(valid)
+    events_df.printSchema()
+    events_df.show(5, truncate=False)
+    write_output(events_df, output_path)
 
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
@@ -82,27 +77,18 @@ def main():
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
     schema = get_tfl_schema()
     parsed_df = parse_json(raw_json_df, schema)
-    valid_df = filter_valid(parsed_df)
-    exploded_df = explode_events(valid_df)
-    converted_df = convert_timestamps(exploded_df)
-
-    # Apply watermark and deduplicate BEFORE foreachBatch
-    deduped_streaming_df = converted_df \
-        .withWatermark("timestamp", "10 minutes") \
-        .dropDuplicates(["id", "stationName", "timestamp"])
 
     def batch_fn(df, batch_id):
         process_batch(df, batch_id, incoming_path)
 
     query = (
-        deduped_streaming_df.writeStream
+        parsed_df.writeStream
         .foreachBatch(batch_fn)
         .option("checkpointLocation", checkpoint_path)
         .start()
     )
 
     query.awaitTermination()
-
 
 if __name__ == "__main__":
     main()
