@@ -1,12 +1,4 @@
-numpy==1.26.2
-pandas==2.2.0
-
-pyspark==4.3.2
+pyspark==4.0.1
 kafka-python==2.1.0
-
-pyspark-pandas==3.3.0       # pandas API on Spark
-pyspark-test==0.4.0         # utilities for Spark testing
-pandas-profiling==3.4.1     # profiling reports
-
-pytest==8.4.0
 requests==2.31.0
+pytest==8.4.0

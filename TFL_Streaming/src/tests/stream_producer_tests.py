@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 import json
 
-import producer  # assuming your file is named producer.py
+import producer
 
 @pytest.fixture
 def sample_events():
