@@ -27,13 +27,14 @@ urls = {
     "Victoria": "https://api.tfl.gov.uk/Line/Victoria/Arrivals"
 }
 
-while True:
+def fetch_and_save_once():
+    """Fetch data from all lines once and save/update CSV files."""
     for line_name, url in urls.items():
         try:
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             data = response.json()
-            
+
             if not data:
                 print(f"No data returned for {line_name}")
                 continue
@@ -56,5 +57,9 @@ while True:
         except Exception as e:
             print(f"Error fetching {line_name}: {e}")
 
-    print("\nWaiting 60 seconds before next fetch...\n")
-    time.sleep(60)
+
+if __name__ == "__main__":
+    while True:
+        fetch_and_save_once()
+        print("\nWaiting 60 seconds before next fetch...\n")
+        time.sleep(60)
