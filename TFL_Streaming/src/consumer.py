@@ -51,13 +51,10 @@ def write_output(df, path):
     df.write.mode("append").parquet(path)
 
 def process_batch(batch_df, batch_id, output_path):
-    """Process each micro-batch: validate, explode, convert timestamps, show, and write."""
-    valid = filter_valid(batch_df)
-    events_df = explode_events(valid)
-    events_df = convert_timestamps(events_df)
-    events_df.printSchema()
-    events_df.show(5, truncate=False)
-    write_output(events_df, output_path)
+    """Inside foreachBatch, just write batch data as is."""
+    batch_df.printSchema()
+    batch_df.show(5, truncate=False)
+    write_output(batch_df, output_path)
 
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
@@ -84,12 +81,20 @@ def main():
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
     schema = get_tfl_schema()
     parsed_df = parse_json(raw_json_df, schema)
+    valid_df = filter_valid(parsed_df)
+    exploded_df = explode_events(valid_df)
+    converted_df = convert_timestamps(exploded_df)
+
+    # **Apply watermark and deduplicate on streaming DataFrame here**
+    deduped_streaming_df = converted_df \
+        .withWatermark("timestamp", "10 minutes") \
+        .dropDuplicates(["id", "stationName", "timestamp"])
 
     def batch_fn(df, batch_id):
         process_batch(df, batch_id, incoming_path)
 
     query = (
-        parsed_df.writeStream
+        deduped_streaming_df.writeStream
         .foreachBatch(batch_fn)
         .option("checkpointLocation", checkpoint_path)
         .start()
