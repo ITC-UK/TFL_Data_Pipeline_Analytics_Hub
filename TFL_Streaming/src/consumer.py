@@ -4,7 +4,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
 def get_tfl_schema():
-    """Return the Spark schema for TFL API data."""
+    """Return the Spark schema for TFL API data, with timestamps as STRING."""
     return ArrayType(StructType([
         StructField("id", StringType()),
         StructField("operationType", IntegerType()),
@@ -18,12 +18,12 @@ def get_tfl_schema():
         StructField("bearing", StringType()),
         StructField("destinationNaptanId", StringType()),
         StructField("destinationName", StringType()),
-        StructField("timestamp", StringType()),
+        StructField("timestamp", StringType()),           # Keep as string initially
         StructField("timeToStation", IntegerType()),
         StructField("currentLocation", StringType()),
         StructField("towards", StringType()),
-        StructField("expectedArrival", StringType()),
-        StructField("timeToLive", StringType()),
+        StructField("expectedArrival", StringType()),     # Keep as string initially
+        StructField("timeToLive", StringType()),          # Keep as string initially
         StructField("modeName", StringType())
     ]))
 
@@ -40,14 +40,21 @@ def explode_events(df):
     exploded = df.select(explode(col("data")).alias("event"))
     return exploded.select("event.*")
 
+def convert_timestamps(df):
+    """Convert timestamp strings to TimestampType columns."""
+    return df.withColumn("timestamp", to_timestamp("timestamp")) \
+             .withColumn("expectedArrival", to_timestamp("expectedArrival")) \
+             .withColumn("timeToLive", to_timestamp("timeToLive"))
+
 def write_output(df, path):
     """Write DataFrame to Parquet in append mode."""
     df.write.mode("append").parquet(path)
 
 def process_batch(batch_df, batch_id, output_path):
-    """Process each micro-batch: validate, explode, show, and write."""
+    """Process each micro-batch: validate, explode, convert timestamps, show, and write."""
     valid = filter_valid(batch_df)
     events_df = explode_events(valid)
+    events_df = convert_timestamps(events_df)
     events_df.printSchema()
     events_df.show(5, truncate=False)
     write_output(events_df, output_path)
