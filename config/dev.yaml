@@ -1,0 +1,37 @@
+# config/dev.yaml
+
+postgres:
+  host: "18.134.163.221"
+  database: "testdb"
+  user: "admin"
+  password: "${PG_PASSWORD}"      # pulled from .env (not in Git)
+  port: 5432
+
+paths:
+  raw_data: "./data/raw"
+  processed_data: "./data/processed"
+  curated_data: "./data/curated"
+
+  bronze: "./src/bronze"
+  silver: "./src/silver"
+
+spark:
+  app_name: "TFL_Pipeline_Dev"
+  master: "local[*]"              # local mode for dev
+kafka:
+  bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVER}
+  topic: "ukde011025tfldata"
+
+hdfs:
+  incoming_path: "hdfs:///tmp/DE011025/uk/streaming/incoming/"
+  checkpoint_path: "hdfs:///tmp/DE011025/uk/streaming/incoming_checkpoints/"
+
+tfl:
+  api_list:
+    piccadilly: "https://api.tfl.gov.uk/Line/Piccadilly/Arrivals"
+    northern: "https://api.tfl.gov.uk/Line/Northern/Arrivals"
+    central: "https://api.tfl.gov.uk/Line/Central/Arrivals"
+    bakerloo: "https://api.tfl.gov.uk/Line/Bakerloo/Arrivals"
+    metropolitan: "https://api.tfl.gov.uk/Line/Metropolitan/Arrivals"
+    victoria: "https://api.tfl.gov.uk/Line/Victoria/Arrivals"
+  polling_interval: 30

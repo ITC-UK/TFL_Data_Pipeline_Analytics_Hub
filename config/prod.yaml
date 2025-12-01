@@ -1,0 +1,20 @@
+# config/prod.yaml
+
+postgres:
+  host: "18.134.163.221"           # If production Postgres differs, update here
+  database: "testdb"
+  user: "admin"
+  password: "${PG_PASSWORD}"
+  port: 5432
+
+paths:
+  raw_data: "./data/raw"
+  processed_data: "./data/processed"
+  curated_data: "./data/curated"
+
+  bronze: "./src/bronze"
+  silver: "./src/silver"
+
+spark:
+  app_name: "TFL_Pipeline_Prod"
+  master: "yarn"                   # or spark://master:7077 depending on your cluster
