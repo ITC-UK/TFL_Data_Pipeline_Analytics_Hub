@@ -1,8 +1,12 @@
-# -*- coding: utf-8 -*-
+import os
+import json
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
+from pyspark.sql.functions import col, from_json, explode
 from pyspark.sql.types import *
+from dotenv import load_dotenv
+import yaml
 
+<<<<<<< Updated upstream
 def get_tfl_schema():
     """Return the Spark schema for TFL API data."""
     return ArrayType(StructType([
@@ -92,3 +96,54 @@ def main():
 
 if __name__ == "__main__":
     main()
+=======
+# Load environment & config
+load_dotenv()
+with open("config/dev.yaml") as f:
+    cfg = yaml.safe_load(f)
+
+KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
+TOPIC = cfg["kafka"]["topic"]
+
+INCOMING_PATH = cfg["hdfs"]["incoming_path"]
+CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
+
+# Load schema
+with open("config/schema/tfl_stream_schema.json") as f:
+    schema_json = json.load(f)
+
+tfl_schema = ArrayType(StructType([
+    StructField(field["name"], StringType() if field["type"]=="string" else IntegerType())
+    for field in schema_json
+]))
+
+spark = SparkSession.builder.appName("UK_TFL_STREAMING_CONSUMER_DEDUPED").getOrCreate()
+
+kafka_df = (
+    spark.readStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers", KAFKA_SERVER)
+    .option("subscribe", TOPIC)
+    .option("startingOffsets", "latest")
+    .load()
+)
+
+raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
+parsed = raw_json_df.withColumn("data", from_json(col("json_value"), tfl_schema))
+
+def process_batch(batch_df, batch_id):
+    valid_rows_df = batch_df.filter(col("data").isNotNull())
+    exploded = valid_rows_df.select(explode(col("data")).alias("event"))
+    df = exploded.select("event.*")
+    df.write.mode("append").parquet(INCOMING_PATH)
+    print(f"Wrote batch {batch_id} to incoming parquet")
+
+query = (
+    parsed.writeStream
+    .foreachBatch(process_batch)
+    .option("checkpointLocation", CHECKPOINT_PATH)
+    .start()
+)
+
+query.awaitTermination()
+>>>>>>> Stashed changes
