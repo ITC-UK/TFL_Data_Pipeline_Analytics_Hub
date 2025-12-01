@@ -1,0 +1,21 @@
+[
+  {"name": "id", "type": "string"},
+  {"name": "operationType", "type": "integer"},
+  {"name": "vehicleId", "type": "string"},
+  {"name": "naptanId", "type": "string"},
+  {"name": "stationName", "type": "string"},
+  {"name": "lineId", "type": "string"},
+  {"name": "lineName", "type": "string"},
+  {"name": "platformName", "type": "string"},
+  {"name": "direction", "type": "string"},
+  {"name": "bearing", "type": "string"},
+  {"name": "destinationNaptanId", "type": "string"},
+  {"name": "destinationName", "type": "string"},
+  {"name": "timestamp", "type": "string"},
+  {"name": "timeToStation", "type": "integer"},
+  {"name": "currentLocation", "type": "string"},
+  {"name": "towards", "type": "string"},
+  {"name": "expectedArrival", "type": "string"},
+  {"name": "timeToLive", "type": "string"},
+  {"name": "modeName", "type": "string"}
+]

@@ -1,0 +1,31 @@
+{
+  "required_fields": [
+    "id",
+    "lineId",
+    "stationName",
+    "timestamp",
+    "timeToStation"
+  ],
+  "all_fields": [
+    "type",
+    "id",
+    "operationType",
+    "vehicleId",
+    "naptanId",
+    "stationName",
+    "lineId",
+    "lineName",
+    "platformName",
+    "direction",
+    "destinationNaptanId",
+    "destinationName",
+    "timestamp",
+    "timeToStation",
+    "currentLocation",
+    "towards",
+    "expectedArrival",
+    "tubeTravelTime",
+    "timeToArrival",
+    "api_fetch_time"
+  ]
+}
