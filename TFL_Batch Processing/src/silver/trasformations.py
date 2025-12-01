@@ -39,75 +39,105 @@ cleaned_dfs = []
 for line_name, table in raw_tables.items():
     print(f"Processing {table}...")
 
-#read hive tables intp pyspark DataFrame
+    #read hive tables intp pyspark DataFrame
+    df = spark.table(f"{RAW_DB}.{table}")
 
-df = spark.table(f"{RAW_DB}.{table}")
+    # drop null col if less than 30% are non-null → mostly empty → DROP it
+    #protect col
 
-# drop null col if less than 30% are non-null → mostly empty → DROP it
-total_count = df.count()
-df = df.drop(*[
-    c for c in df.columns
-    if df.filter(col(c).isNotNull()).count() < total_count * 0.3])
+    protected_cols = [
+        "direction",
+        "platformName",
+        "stationName",
+        "lineId",
+        "lineName",
+        "vehicleId",
+        "destinationName",
+        "destinationNaptanId",
+        "timestamp",
+        "timeToStation",
+        "expectedArrival",
+        "currentLocation"
+    ]
 
-#Convert Timestamp to Readable Datetime
-# in raw time stamp in millisec - from unixtime need seconds
-#created new col event_time = readable datetime
-df = df.withColumn(
-    "event_time",
-    from_unixtime(col("timestamp") / 1000))
+    total_count = df.count()
 
-#then remove old timestamp
-df = df.drop("timestamp")
+    cols_to_evaluate = [c for c in df.columns if c not in protected_cols]
 
-#Remove LOGICAL Duplicates - removes same tarin, same station, on same line, at same datetime
-df = df.dropDuplicates(["id", "stationName", "lineName", "event_time"])
+    cols_to_drop = [
+        c for c in cols_to_evaluate
+        if df.filter(col(c).isNotNull()).count() < total_count * 0.3
+    ]
 
-#String Cleaning 
-#Add line → which line (bakerloo, central…)
-#trim() removes spaces
-#lower() makes everything consistent
+    df = df.drop(*cols_to_drop)
 
-df = (
-    df.withColumn("line_group", lit(line_name))
-      .withColumn("stationName", trim(col("stationName")))
-      .withColumn("lineName", lower(trim(col("lineName"))))
-      .withColumn("platformName", trim(col("platformName")))
-      .withColumn("direction", trim(col("direction")))
-      .withColumn("destinationName", trim(col("destinationName")))
-      .withColumn("currentLocation", trim(col("currentLocation")))
-      .withColumn("towards", trim(col("towards"))))
+    #String Cleaning 
+    #Add line → which line (bakerloo, central…)
+    #trim() removes spaces
+    #lower() makes everything consistent
 
-# adding new col becoz train type (real and predicted having - values)
+    df = (
+        df.withColumn("stationName", trim(col("stationName")))
+          .withColumn("lineName", trim(col("lineName")))
+          .withColumn("platformName", trim(col("platformName")))
+          .withColumn("direction", trim(col("direction")))
+          .withColumn("destinationName", trim(col("destinationName")))
+          .withColumn("currentLocation", trim(col("currentLocation")))
+          .withColumn("towards", trim(col("towards")))
+    )
 
-df = df.withColumn(
-    "train_type",
-    when(col("id") > 0, lit("real"))
-    .otherwise(lit("predicted")))
+    #Convert Timestamp to Readable Datetime
+    df = df.withColumn("event_time", col("timestamp").cast("timestamp"))
+    df = df.drop("timestamp")
 
-#store cleaned dataframe into an empty list created before
-cleaned_dfs.append(df)
+    #Remove LOGICAL Duplicates - removes same tarin, same station, on same line, at same datetime
+    df = df.dropDuplicates(["id", "stationName", "lineName", "event_time"])
+
+    #IMPROVE direction USING platformName
+    df = df.withColumn(
+        "direction",
+        when(col("direction").isNull() | (col("direction") == ""), 
+            when(lower(col("platformName")).contains("eastbound"), lit("eastbound"))
+            .when(lower(col("platformName")).contains("westbound"), lit("westbound"))
+            .when(lower(col("platformName")).contains("northbound"), lit("northbound"))
+            .when(lower(col("platformName")).contains("southbound"), lit("southbound"))
+            .when(lower(col("platformName")).contains("inner rail"), lit("inner-rail"))
+            .when(lower(col("platformName")).contains("outer rail"), lit("outer-rail"))
+            .otherwise(None)
+        ).otherwise(col("direction"))
+    )
+
+    # adding new col becoz train type (real and predicted having - values)
+    df = df.withColumn(
+        "train_type",
+        when(col("vehicleId").isNotNull(), lit("real"))
+        .otherwise(lit("predicted"))
+    )
+
+    #add line_group 
+    df = df.withColumn("line_group", lit(line_name))
+
+    #select only required columns
+    final_columns = [
+        "id", "vehicleId", "naptanId", "stationName", "lineId",
+        "lineName", "line_group", "platformName", "direction",
+        "destinationNaptanId", "destinationName", "event_time",
+        "timeToStation", "currentLocation", "towards", "expectedArrival",
+        "train_type"
+    ]
+
+    df = df.select([c for c in final_columns if c in df.columns])
+
+    #store cleaned dataframe into an empty list created before
+    cleaned_dfs.append(df)
 
 #Union All Six Lines Into One Silver DataFrame
-#reduce() → takes the first two DFs, unions them--Then union result with third--Then 4th → until all 6 are combined
-#unionByName() aligns columns by name
-#allowMissingColumns=True fills missing columns with nulls
-
 df_silver = reduce(lambda a, b: a.unionByName(b, allowMissingColumns=True), cleaned_dfs)
 
-#Reorder Columns for Clean Output - only required coloumns
-final_columns = [
-    "id", "operationType", "vehicleId", "naptanId", "stationName", "lineId",
-    "lineName", "line_group", "platformName", "direction",
-    "destinationNaptanId", "destinationName", "event_time",
-    "timeToStation", "currentLocation", "towards", "expectedArrival",
-    "tubeTravelTime", "timeToArrival", "train_type"
-]
-
-#select columns in oder 
-df_silver = df_silver.select([c for c in final_columns if c in df_silver.columns])
+#select columns in order 
+df_silver = df_silver.select(final_columns)
 
 #Write Silver table to Hive
-
 df_silver.write.mode("overwrite").format("parquet").saveAsTable(
     f"{SILVER_DB}.tfl_tube_arrivals_silver")
 
