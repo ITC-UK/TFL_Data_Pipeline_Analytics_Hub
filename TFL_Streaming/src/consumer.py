@@ -51,10 +51,11 @@ def write_output(df, path):
     df.write.mode("append").parquet(path)
 
 def process_batch(batch_df, batch_id, output_path):
-    """Inside foreachBatch, just write batch data as is."""
+    """Inside foreachBatch, just write the batch as-is."""
     batch_df.printSchema()
     batch_df.show(5, truncate=False)
     write_output(batch_df, output_path)
+
 
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
@@ -85,7 +86,7 @@ def main():
     exploded_df = explode_events(valid_df)
     converted_df = convert_timestamps(exploded_df)
 
-    # **Apply watermark and deduplicate on streaming DataFrame here**
+    # Apply watermark and deduplicate BEFORE foreachBatch
     deduped_streaming_df = converted_df \
         .withWatermark("timestamp", "10 minutes") \
         .dropDuplicates(["id", "stationName", "timestamp"])
@@ -101,6 +102,7 @@ def main():
     )
 
     query.awaitTermination()
+
 
 if __name__ == "__main__":
     main()
