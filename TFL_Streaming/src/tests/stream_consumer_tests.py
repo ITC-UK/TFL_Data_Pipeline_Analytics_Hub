@@ -3,6 +3,11 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 from pyspark.sql.types import Row
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../TFL_Streaming/src')))
+import consumer
+
 from consumer import (
     get_tfl_schema,
     parse_json,

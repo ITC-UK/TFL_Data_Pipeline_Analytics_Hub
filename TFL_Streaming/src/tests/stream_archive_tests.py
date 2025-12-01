@@ -2,6 +2,14 @@ import pytest
 from unittest.mock import MagicMock, patch
 import stream_archive  # assuming your file is named archive.py
 
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../TFL_Streaming/src')))
+import stream_archive
+
+
+
 @pytest.fixture
 def mock_spark():
     """Return a mock SparkSession with _jvm and _jsc attributes."""
