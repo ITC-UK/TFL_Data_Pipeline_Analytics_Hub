@@ -1,130 +1,60 @@
-#!/usr/bin/env python3.8
 import os
-import sys
-import argparse
 import pandas as pd
-from datetime import datetime
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import create_engine
 from urllib.parse import quote_plus
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
+import yaml
 
-def load_environment(env_path=None):
-    load_dotenv(dotenv_path=env_path)
+# Load environment variables
+load_dotenv()
 
-def create_db_engine():
-    user = os.getenv("DB_USERNAME")
-    password = quote_plus(os.getenv("DB_PASSWORD", ""))
-    host = os.getenv("DB_HOST")
-    port = os.getenv("DB_PORT")
-    db = os.getenv("DB_NAME")
+# Load dev config
+with open("config/dev.yaml", "r") as f:
+    config = yaml.safe_load(f)
 
-    if not all([user, password, host, port, db]):
-        print("ERROR: Missing database environment variables.")
-        sys.exit(1)
+RAW_DIR = config["paths"]["raw_data"]
 
-    conn_str = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+PG_USER = config["postgres"]["user"]
+PG_PASSWORD = quote_plus(os.getenv("PG_PASSWORD"))
+PG_HOST = config["postgres"]["host"]
+PG_DB = config["postgres"]["database"]
+PG_PORT = config["postgres"]["port"]
 
+def get_engine():
+    """Create and return a SQLAlchemy engine."""
     try:
-        engine = create_engine(conn_str, pool_pre_ping=True)
-        print("PostgreSQL engine created successfully.")
+        engine = create_engine(
+            f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
+        )
+        print("DB connected successfully")
         return engine
-    except SQLAlchemyError as e:
-        print(f"Engine creation failed: {e}")
-        sys.exit(1)
-
-def load_csv(line_name):
-    base_path = os.getenv("RAW_PATH", "../../data/raw")
-    csv_path = f"{base_path}/{line_name}.csv"
-
-    if not os.path.exists(csv_path):
-        print(f"ERROR: File not found: {csv_path}")
-        return None
-
-    df = pd.read_csv(csv_path)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-
-    return df
-
-
-# FULL LOAD
-def full_load(engine, line):
-    table = f"TFL_{line.lower()}_lines"
-
-    df = load_csv(line)
-    if df is None:
-        return
-
-    df.to_sql(table, engine, if_exists="replace", index=False)
-    print(f"FULL LOAD: {len(df)} rows loaded → {table}")
-
-
-# INCREMENTAL LOAD
-def incremental_load(engine, line):
-    table = f"TFL_{line.lower()}_lines"
-
-    df = load_csv(line)
-    if df is None:
-        return
-
-    with engine.connect() as conn:
-        query = text(f'SELECT MAX("timestamp") FROM "{table}"')
-        result = conn.execute(query)
-        max_ts = result.scalar() or datetime(1970, 1, 1)
-
-    print(f"{line}: Last timestamp in DB = {max_ts}")
-
-    df_new = df[df["timestamp"] > max_ts].sort_values("timestamp")
-
-    if df_new.empty:
-        print(f"{line}: No new rows.")
-        return
-
-    df_new.to_sql(table, engine, if_exists="append", index=False)
-    print(f"{line}: {len(df_new)} new rows inserted.")
-
-# RUN FOR ALL LINES
-TFL_LINES = ["Bakerloo", "Central", "Metropolitan", "Northern", "Piccadilly", "Victoria"]
-
-
-def run_full(engine):
-    print("\n STARTING FULL LOAD FOR ALL TFL LINES...\n")
-    for line in TFL_LINES:
-        full_load(engine, line)
-
-
-def run_incremental(engine):
-    print("\n STARTING INCREMENTAL LOAD FOR ALL TFL LINES...\n")
-    for line in TFL_LINES:
-        incremental_load(engine, line)
-
-#  ARG PARSER
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["full", "inc"], help="ETL mode")
-    return parser.parse_args()
-
-# MAIN FUNCTION
-def main():
-    args = parse_args()
-
-    load_environment(os.getenv("ENV_FILE"))
-    engine = create_db_engine()
-
-    try:
-        if args.mode == "full":
-            run_full(engine)
-        if args.mode == "inc":
-            run_incremental(engine)
-
     except Exception as e:
-        print(" ETL FAILED")
-        print(str(e))
-        sys.exit(1)
-    finally:
-        engine.dispose()
-        print("\n Postgres connection closed.")
+        print(f"Error connecting to DB: {e}")
+        raise
+
+def load_csv_to_postgres():
+    """Load CSV files from RAW_DIR into Postgres."""
+    engine = get_engine()
+
+    csv_files = [f for f in os.listdir(RAW_DIR) if f.endswith(".csv")]
+
+    for file in csv_files:
+        table_name = f"TFL_{file.replace('.csv','').lower()}_lines"
+        file_path = os.path.join(RAW_DIR, file)
+
+        # Wrap CSV read in try/except
+        try:
+            df = pd.read_csv(file_path)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+            continue
+
+        try:
+            df.to_sql(table_name, engine, if_exists="append", index=False)
+            print(f"{len(df)} rows appended to {table_name}")
+        except Exception as e:
+            print(f"Error inserting {file} into {table_name}: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    load_csv_to_postgres()
