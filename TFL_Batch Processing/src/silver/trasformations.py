@@ -117,6 +117,8 @@ output_path = "/tmp/DE011025/TFL_Batch_processing/silver-output2"
 
 df_silver.write.mode("overwrite").csv(output_path)
 
+#df_silver.write.mode("overwrite").parquet(output_path)
+
 print("Silver file saved to HDFS:", output_path)
 
 
