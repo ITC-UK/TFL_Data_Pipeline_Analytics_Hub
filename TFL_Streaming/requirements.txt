@@ -1,4 +1,4 @@
-pyspark==4.0.1
+pyspark==2.4.7
 kafka-python==2.1.0
 requests==2.31.0
 pytest==8.4.0
