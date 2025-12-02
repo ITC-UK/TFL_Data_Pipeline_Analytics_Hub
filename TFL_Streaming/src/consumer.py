@@ -1,5 +1,4 @@
 import os
-import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, explode
 from pyspark.sql.types import *
@@ -19,7 +18,6 @@ CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]
 
 def get_tfl_schema():
-    """Return the Spark schema for TFL API data."""
     return ArrayType(StructType([
         StructField("id", StringType()),
         StructField("operationType", IntegerType()),
@@ -33,12 +31,12 @@ def get_tfl_schema():
         StructField("bearing", StringType()),
         StructField("destinationNaptanId", StringType()),
         StructField("destinationName", StringType()),
-        StructField("timestamp", StringType()),
+        StructField("timestamp", TimestampType()),
         StructField("timeToStation", IntegerType()),
         StructField("currentLocation", StringType()),
         StructField("towards", StringType()),
-        StructField("expectedArrival", StringType()),
-        StructField("timeToLive", StringType()),
+        StructField("expectedArrival", TimestampType()),
+        StructField("timeToLive", TimestampType()),
         StructField("modeName", StringType())
     ]))
 
