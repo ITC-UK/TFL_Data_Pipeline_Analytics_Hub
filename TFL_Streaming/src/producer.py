@@ -7,7 +7,6 @@ from kafka import KafkaProducer
 from dotenv import load_dotenv
 import yaml
 
-<<<<<<< Updated upstream
 API_LIST = {
     "piccadilly":   "https://api.tfl.gov.uk/Line/Piccadilly/Arrivals",
     "northern":     "https://api.tfl.gov.uk/Line/Northern/Arrivals",
@@ -41,47 +40,12 @@ def enrich_events(events, line_name):
     for event in events:
         event["line"] = line_name
     return events
-=======
-# Load .env
-load_dotenv()
-
-# Load config
-with open("config/dev.yaml") as f:
-    cfg = yaml.safe_load(f)
-
-KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
-TOPIC = cfg["kafka"]["topic"]
-POLL_INTERVAL = cfg["tfl"]["polling_interval"]
-
-TFL_APP_ID = os.getenv("TFL_APP_ID")
-TFL_APP_KEY = os.getenv("TFL_APP_KEY")
-API_LIST = cfg["tfl"]["api_list"]
-
-producer = KafkaProducer(
-    bootstrap_servers=[KAFKA_SERVER],
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
-)
-
-while True:
-    print("Pulling TFL updates...")
-    for line_name, api_url in API_LIST.items():
-        url = f"{api_url}?app_id={TFL_APP_ID}&app_key={TFL_APP_KEY}"
-        data = requests.get(url).json()
-
-        for event in data:
-            event["line"] = line_name
-
-            producer.send(TOPIC, value=event)
-
-        print(f"[SENT] {line_name} updates")
->>>>>>> Stashed changes
 
 def send_events(producer, topic, events):
     """Send events to Kafka."""
     for event in events:
         producer.send(topic, value=event)
     producer.flush()
-<<<<<<< Updated upstream
 
 def poll_and_send(producer, topic, api_list, app_id, app_key):
     """Fetch data from all APIs and send to Kafka."""
@@ -93,6 +57,20 @@ def poll_and_send(producer, topic, api_list, app_id, app_key):
 
 def main(poll_interval=30):
     """Main loop to continuously poll TFL and send updates to Kafka."""
+
+    load_dotenv()
+
+    with open("config/dev.yaml") as f:
+        cfg = yaml.safe_load(f)
+
+    KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
+    TOPIC = cfg["kafka"]["topic"]
+    POLL_INTERVAL = cfg["tfl"]["polling_interval"]
+
+    TFL_APP_ID = os.getenv("TFL_APP_ID")
+    TFL_APP_KEY = os.getenv("TFL_APP_KEY")
+    API_LIST = cfg["tfl"]["api_list"]
+
     producer = create_producer(KAFKA_SERVERS)
     while True:
         print("Pulling TFL updates...")
@@ -102,7 +80,3 @@ def main(poll_interval=30):
 
 if __name__ == "__main__":
     main()
-=======
-    print(f"Sleeping {POLL_INTERVAL} seconds...\n")
-    time.sleep(POLL_INTERVAL)
->>>>>>> Stashed changes
