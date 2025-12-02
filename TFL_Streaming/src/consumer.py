@@ -3,8 +3,20 @@ import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, explode
 from pyspark.sql.types import *
-# from dotenv import load_dotenv
 import yaml
+
+with open("config/dev.yaml") as f:
+    cfg = yaml.safe_load(f)
+
+KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
+TOPIC = cfg["kafka"]["topic"]
+POLL_INTERVAL = cfg["tfl"]["polling_interval"]
+
+TFL_APP_ID = os.getenv("TFL_APP_ID")
+TFL_APP_KEY = os.getenv("TFL_APP_KEY")
+API_LIST = cfg["tfl"]["api_list"]
+CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
+INCOMING_PATH = cfg["hdfs"]["incoming_path"]
 
 def get_tfl_schema():
     """Return the Spark schema for TFL API data."""
@@ -47,7 +59,7 @@ def write_output(df, path):
     """Write DataFrame to Parquet in append mode."""
     df.write.mode("append").parquet(path)
 
-def process_batch(batch_df, batch_id, output_path):
+def process_batch(batch_df, output_path):
     """Process each micro-batch: validate, explode, show, and write."""
     valid = filter_valid(batch_df)
     events_df = explode_events(valid)
@@ -57,11 +69,6 @@ def process_batch(batch_df, batch_id, output_path):
 
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
-    kafka_servers = "ip-172-31-3-80.eu-west-2.compute.internal:9092"
-    topic = "ukde011025tfldata"
-    incoming_path = "hdfs:///tmp/DE011025/uk/streaming/incoming/"
-    checkpoint_path = "hdfs:///tmp/DE011025/uk/streaming/incoming_checkpoints/"
-
     spark = (
         SparkSession.builder
         .appName("UK_TFL_STREAMING_CONSUMER_DEDUPED")
@@ -71,8 +78,8 @@ def main():
     kafka_df = (
         spark.readStream
         .format("kafka")
-        .option("kafka.bootstrap.servers", kafka_servers)
-        .option("subscribe", topic)
+        .option("kafka.bootstrap.servers", KAFKA_SERVER)
+        .option("subscribe", TOPIC)
         .option("startingOffsets", "latest")
         .load()
     )
@@ -82,12 +89,12 @@ def main():
     parsed_df = parse_json(raw_json_df, schema)
 
     def batch_fn(df, batch_id):
-        process_batch(df, batch_id, incoming_path)
+        process_batch(df, batch_id, INCOMING_PATH)
 
     query = (
         parsed_df.writeStream
         .foreachBatch(batch_fn)
-        .option("checkpointLocation", checkpoint_path)
+        .option("checkpointLocation", CHECKPOINT_PATH)
         .start()
     )
 
