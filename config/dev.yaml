@@ -11,6 +11,7 @@ paths:
   raw_data: "./data/raw"
   processed_data: "./data/processed"
   curated_data: "./data/curated"
+  streaming_archive: "file:///tmp/DE011025/uk/streaming/archive"
 
   bronze: "./src/bronze"
   silver: "./src/silver"
@@ -36,3 +37,5 @@ tfl:
     metropolitan: "https://api.tfl.gov.uk/Line/Metropolitan/Arrivals"
     victoria: "https://api.tfl.gov.uk/Line/Victoria/Arrivals"
   polling_interval: 30
+  app_id: "92293faa428041caad3dd647d39753a0"
+  app_key: "ba72936a3db54b4ba5792dc8f7acc043"
