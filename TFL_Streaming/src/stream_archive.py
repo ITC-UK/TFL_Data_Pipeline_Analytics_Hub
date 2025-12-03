@@ -16,7 +16,10 @@ API_LIST = cfg["tfl"]["api_list"]
 CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]
 
-spark = SparkSession.builder.appName(TFL_APP_ID).getOrCreate()
+spark = (
+    SparkSession.builder
+    .appName("UK_TFL_STREAM_ARCHIVE")
+    .getOrCreate())
 
 def get_hadoop_fs(spark):
     """Return Hadoop FileSystem object from SparkSession."""

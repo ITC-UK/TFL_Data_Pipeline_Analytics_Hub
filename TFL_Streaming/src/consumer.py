@@ -17,6 +17,19 @@ API_LIST = cfg["tfl"]["api_list"]
 CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]
 
+spark = (
+    SparkSession.builder
+    .appName("UK_TFL_STREAMING_CONSUMER_DEDUPED")
+    .getOrCreate())
+
+kafka_df = (
+    spark.readStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers", KAFKA_SERVER)
+    .option("subscribe", TOPIC)
+    .option("startingOffsets", "latest")
+    .load())
+
 def get_tfl_schema():
     return ArrayType(StructType([
         StructField("id", StringType()),
@@ -57,7 +70,8 @@ def write_output(df, path):
     """Write DataFrame to Parquet in append mode."""
     df.write.mode("append").parquet(path)
 
-def process_batch(batch_df, output_path):
+
+def process_batch(batch_df, batch_id, output_path):
     """Process each micro-batch: validate, explode, show, and write."""
     valid = filter_valid(batch_df)
     events_df = explode_events(valid)
@@ -65,23 +79,13 @@ def process_batch(batch_df, output_path):
     events_df.show(5, truncate=False)
     write_output(events_df, output_path)
 
+
+def batch_fn(df, batch_id):
+    process_batch(df, batch_id, INCOMING_PATH)
+
+
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
-    spark = (
-        SparkSession.builder
-        .appName("UK_TFL_STREAMING_CONSUMER_DEDUPED")
-        .getOrCreate()
-    )
-
-    kafka_df = (
-        spark.readStream
-        .format("kafka")
-        .option("kafka.bootstrap.servers", KAFKA_SERVER)
-        .option("subscribe", TOPIC)
-        .option("startingOffsets", "latest")
-        .load()
-    )
-
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
     schema = get_tfl_schema()
     parsed_df = parse_json(raw_json_df, schema)
