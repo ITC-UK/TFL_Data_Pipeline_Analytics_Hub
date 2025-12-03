@@ -1,16 +1,105 @@
 pipeline {
-agent any
+    agent any
 
-stages {
-    stage('Run Spark Streaming Job') {
-        steps {
-            sh """
-                spark-submit \
-                  --master local \
-                  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7,com.lihaoyi:requests_2.11:0.7.1 \
-                  TFL_Streaming/src/stream_archive.py
-            """
+    environment {
+        PYSPARK_PYTHON = "/usr/bin/python3"
+        PYSPARK_DRIVER_PYTHON = "/usr/bin/python3"
+    }
+
+    stages {
+        stage('Upgrade pip') {
+            steps {
+                sh '''
+                    echo "=== Upgrading pip ==="
+                    python3 -m pip install --upgrade pip setuptools wheel
+                '''
+            }
+        }
+
+        stage('Install Python dependencies') {
+            steps {
+                sh '''
+                    echo "=== Installing Python dependencies ==="
+                    python3 -m pip install --user -r TFL_Streaming/requirements.txt
+                '''
+            }
+        }
+
+        stage('Start Archive Stream') {
+            steps {
+                sh '''
+                    echo "=== Archive old stream ==="
+                    spark-submit \
+                      --master local \
+                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
+                      TFL_Streaming/src/stream_archive.py &
+                '''
+            }
+        }
+
+        stage('Start Producer') {
+            steps {
+                sh '''
+                    echo "=== Start running Producer ==="
+                    spark-submit \
+                      --master local \
+                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
+                      TFL_Streaming/src/producer.py &
+                    
+                    echo $! > producer.pid
+                '''
+            }
+        }
+
+        stage('Start Consumer') {
+            steps {
+                sh '''
+                    sleep 5  # Let producer start
+
+                    echo "=== Start running Consumer ==="
+                    spark-submit \
+                      --master local \
+                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
+                      TFL_Streaming/src/consumer.py &
+                    
+                    echo $! > consumer.pid
+                '''
+            }
+        }
+
+        stage('Run for 30 seconds') {
+            steps {
+                sh '''
+                    echo "=== Running for 30 seconds... ==="
+                    sleep 30
+                '''
+            }
+        }
+
+        stage('Stop Processes') {
+            steps {
+                sh '''
+                    echo "=== Stopping processes ==="
+
+                    if [ -f producer.pid ]; then
+                        kill $(cat producer.pid) || true
+                    fi
+
+                    if [ -f consumer.pid ]; then
+                        kill $(cat consumer.pid) || true
+                    fi
+
+                    echo "=== Job completed ==="
+                '''
+            }
         }
     }
-}
+
+    post {
+        always {
+            sh '''
+                rm -f producer.pid consumer.pid
+            '''
+        }
+    }
 }
