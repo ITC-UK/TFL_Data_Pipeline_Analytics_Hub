@@ -27,7 +27,7 @@ kafka_df = (
     .format("kafka")
     .option("kafka.bootstrap.servers", KAFKA_SERVER)
     .option("subscribe", TOPIC)
-    .option("startingOffsets", "latest")
+    .option("startingOffsets", "earliest")
     .load())
 
 def get_tfl_schema():
