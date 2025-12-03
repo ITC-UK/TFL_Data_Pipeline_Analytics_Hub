@@ -4,7 +4,7 @@ postgres:
   host: "18.134.163.221"
   database: "testdb"
   user: "admin"
-  password: "${PG_PASSWORD}"      # pulled from .env (not in Git)
+  password: "admin123"
   port: 5432
 
 paths:
@@ -17,9 +17,10 @@ paths:
 
 spark:
   app_name: "TFL_Pipeline_Dev"
-  master: "local[*]"              # local mode for dev
+  master: "local[*]"
+
 kafka:
-  bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVER}
+  bootstrap_servers: "ip-172-31-3-80.eu-west-2.compute.internal:9092"
   topic: "ukde011025tfldata"
 
 hdfs:
