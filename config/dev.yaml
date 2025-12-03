@@ -36,3 +36,5 @@ tfl:
     metropolitan: "https://api.tfl.gov.uk/Line/Metropolitan/Arrivals"
     victoria: "https://api.tfl.gov.uk/Line/Victoria/Arrivals"
   polling_interval: 30
+  app_id: "92293faa428041caad3dd647d39753a0"
+  app_key: "ba72936a3db54b4ba5792dc8f7acc043"
