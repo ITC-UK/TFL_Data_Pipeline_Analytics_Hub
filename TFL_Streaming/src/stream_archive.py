@@ -15,6 +15,7 @@ TFL_APP_KEY = cfg["tfl"]["app_key"]
 API_LIST = cfg["tfl"]["api_list"]
 CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]
+ARCHIVE_PATH = cfg["paths"]["streaming_archive"]
 
 def getSpark():
     return SparkSession.builder.appName("UK_TFL_STREAM_ARCHIVE").getOrCreate()
@@ -41,13 +42,11 @@ def delete_remaining(fs, path):
 
 def main():
     spark = getSpark()
-    incoming_path = "hdfs:///tmp/DE011025/uk/streaming/incoming/"
-    archive_path = "/tmp/DE011025/uk/streaming/archive"
 
     fs = get_hadoop_fs()
-    hadoop_incoming = spark._jvm.org.apache.hadoop.fs.Path(incoming_path)
+    hadoop_incoming = spark._jvm.org.apache.hadoop.fs.Path(INCOMING_PATH)
 
-    archive_files(fs, hadoop_incoming, archive_path)
+    archive_files(fs, hadoop_incoming, ARCHIVE_PATH)
     delete_remaining(fs, hadoop_incoming)
 
 if __name__ == "__main__":
