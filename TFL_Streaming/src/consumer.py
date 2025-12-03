@@ -11,8 +11,8 @@ KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
 TOPIC = cfg["kafka"]["topic"]
 POLL_INTERVAL = cfg["tfl"]["polling_interval"]
 
-TFL_APP_ID = os.getenv("TFL_APP_ID")
-TFL_APP_KEY = os.getenv("TFL_APP_KEY")
+TFL_APP_ID = cfg["tfl"]["app_id"]
+TFL_APP_KEY = cfg["tfl"]["app_key"]
 API_LIST = cfg["tfl"]["api_list"]
 CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]

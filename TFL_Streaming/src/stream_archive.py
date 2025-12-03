@@ -10,8 +10,8 @@ KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
 TOPIC = cfg["kafka"]["topic"]
 POLL_INTERVAL = cfg["tfl"]["polling_interval"]
 
-TFL_APP_ID = os.getenv("TFL_APP_ID")
-TFL_APP_KEY = os.getenv("TFL_APP_KEY")
+TFL_APP_ID = cfg["tfl"]["app_id"]
+TFL_APP_KEY = cfg["tfl"]["app_key"]
 API_LIST = cfg["tfl"]["api_list"]
 CHECKPOINT_PATH = cfg["hdfs"]["checkpoint_path"]
 INCOMING_PATH = cfg["hdfs"]["incoming_path"]
@@ -29,7 +29,8 @@ def archive_files(fs, src_path, dst_path):
         for f in files:
             src = f.getPath()
             dst = fs.makeQualified(fs.getUri(), fs.getWorkingDirectory())
-            dst = fs._jvm.org.apache.hadoop.fs.Path(f"{dst_path}/{src.getName()}")
+            dst = fs._jvm.org.apache.hadoop.fs.Path("{}/{}".format(dst_path, src.getName()))
+
             fs.rename(src, dst)
         print("Archived incoming parquet files")
 
@@ -47,4 +48,8 @@ def main():
     hadoop_incoming = spark._jvm.org.apache.hadoop.fs.Path(incoming_path)
 
     archive_files(fs, hadoop_incoming, archive_path)
-    delete_remaining(fs, ha_
+    delete_remaining(fs, hadoop_incoming)
+
+if __name__ == "__main__":
+    main()
+
