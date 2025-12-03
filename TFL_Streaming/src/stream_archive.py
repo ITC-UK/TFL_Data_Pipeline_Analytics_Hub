@@ -20,7 +20,6 @@ def getSpark():
     return SparkSession.builder.appName("UK_TFL_STREAM_ARCHIVE").getOrCreate()
 
 def get_hadoop_fs():
-    """Return Hadoop FileSystem object from SparkSession."""
     spark = getSpark()
     return spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
 
