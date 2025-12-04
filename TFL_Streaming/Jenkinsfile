@@ -22,7 +22,7 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Start Producer') {
             steps {
                 sh '''
@@ -48,9 +48,9 @@ pipeline {
             }
         }
 
-        stage('Run for 30 seconds') {
+        stage('Run for 60 seconds') {
             steps {
-                sh 'sleep 30'
+                sh 'sleep 60'
             }
         }
 
