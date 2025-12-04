@@ -10,7 +10,6 @@ pipeline {
         stage('Upgrade pip') {
             steps {
                 sh '''
-                    echo "=== Upgrading pip ==="
                     python3 -m pip install --upgrade pip setuptools wheel
                 '''
             }
@@ -19,7 +18,6 @@ pipeline {
         stage('Install Python dependencies') {
             steps {
                 sh '''
-                    echo "=== Installing Python dependencies ==="
                     python3 -m pip install --user -r TFL_Streaming/requirements.txt
                 '''
             }
@@ -28,7 +26,6 @@ pipeline {
         stage('Start Archive Stream') {
             steps {
                 sh '''
-                    echo "=== Archive old stream ==="
                     spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
@@ -40,12 +37,10 @@ pipeline {
         stage('Start Producer') {
             steps {
                 sh '''
-                    echo "=== Start running Producer ==="
                     spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
                       TFL_Streaming/src/producer.py &
-                    
                     echo $! > producer.pid
                 '''
             }
@@ -54,14 +49,11 @@ pipeline {
         stage('Start Consumer') {
             steps {
                 sh '''
-                    sleep 5  # Let producer start
-
-                    echo "=== Start running Consumer ==="
+                    sleep 5
                     spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
                       TFL_Streaming/src/consumer.py &
-                    
                     echo $! > consumer.pid
                 '''
             }
@@ -69,27 +61,23 @@ pipeline {
 
         stage('Run for 30 seconds') {
             steps {
-                sh '''
-                    echo "=== Running for 30 seconds... ==="
-                    sleep 30
-                '''
+                sh 'sleep 30'
             }
         }
 
         stage('Stop Processes') {
             steps {
                 sh '''
-                    echo "=== Stopping processes ==="
+                    if [ -f producer.pid ]; then kill $(cat producer.pid) || true; fi
+                    if [ -f consumer.pid ]; then kill $(cat consumer.pid) || true; fi
+                '''
+            }
+        }
 
-                    if [ -f producer.pid ]; then
-                        kill $(cat producer.pid) || true
-                    fi
-
-                    if [ -f consumer.pid ]; then
-                        kill $(cat consumer.pid) || true
-                    fi
-
-                    echo "=== Job completed ==="
+        stage('Refresh Impala Metadata') {
+            steps {
+                sh '''
+                    impala-shell -q "REFRESH streaming_tfl_db.tfl_streaming_arrivals;"
                 '''
             }
         }
@@ -97,9 +85,7 @@ pipeline {
 
     post {
         always {
-            sh '''
-                rm -f producer.pid consumer.pid
-            '''
+            sh 'rm -f producer.pid consumer.pid'
         }
     }
 }
