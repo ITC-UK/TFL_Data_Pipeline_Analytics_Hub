@@ -76,14 +76,14 @@ def process_batch(batch_df, batch_id, output_path):
     """Process each micro-batch: validate, explode, log, and write."""
     valid = filter_valid(batch_df)
     events_df = explode_events(valid)
-    
+
     # Log sample and row count
     row_count = events_df.count()
-    print(f"=== Batch {batch_id}: {row_count} rows ===")
+    print("=== Batch {}: {} rows ===".format(batch_id, row_count))
     if row_count > 0:
         print("Sample rows:")
         events_df.show(5, truncate=False)
-    
+
     write_output(events_df, output_path)
 
 def main():
