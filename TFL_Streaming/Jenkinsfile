@@ -23,29 +23,55 @@ pipeline {
             }
         }
 
-        stage('Run Producer (1 min)') {
+        stage('Start Producer') {
             steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    sh '''
-                        spark-submit \
-                          --master local \
-                          --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
-                          TFL_Streaming/src/producer.py
-                    '''
-                }
+                sh '''
+                    mkdir -p logs
+                    nohup spark-submit \
+                      --master local \
+                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
+                      TFL_Streaming/src/producer.py > logs/producer.log 2>&1 &
+                    echo $! > producer.pid
+                '''
             }
         }
 
-        stage('Run Consumer (1 min)') {
+        stage('Start Consumer') {
             steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    sh '''
-                        spark-submit \
-                          --master local \
-                          --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-                          TFL_Streaming/src/consumer.py
-                    '''
-                }
+                sh '''
+                    sleep 5  # give producer a head start
+                    nohup spark-submit \
+                      --master local \
+                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
+                      TFL_Streaming/src/consumer.py > logs/consumer.log 2>&1 &
+                    echo $! > consumer.pid
+                '''
+            }
+        }
+
+        stage('Run Streaming') {
+            steps {
+                sh '''
+                    echo "Streaming for 60 seconds..."
+                    sleep 60
+                '''
+            }
+        }
+
+        stage('Stop Processes') {
+            steps {
+                sh '''
+                    if [ -f producer.pid ]; then
+                        echo "Stopping producer..."
+                        kill $(cat producer.pid) || true
+                        rm producer.pid
+                    fi
+                    if [ -f consumer.pid ]; then
+                        echo "Stopping consumer..."
+                        kill $(cat consumer.pid) || true
+                        rm consumer.pid
+                    fi
+                '''
             }
         }
 
@@ -55,6 +81,15 @@ pipeline {
                     impala-shell -q "REFRESH streaming_tfl_db.tfl_streaming_arrivals;"
                 '''
             }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+                rm -f producer.pid consumer.pid
+                echo "Pipeline cleanup done."
+            '''
         }
     }
 }
