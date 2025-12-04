@@ -20,7 +20,8 @@ INCOMING_PATH = cfg["hdfs"]["incoming_path"]
 spark = (
     SparkSession.builder
     .appName("UK_TFL_STREAMING_CONSUMER_DEDUPED")
-    .getOrCreate())
+    .getOrCreate()
+)
 
 kafka_df = (
     spark.readStream
@@ -28,7 +29,8 @@ kafka_df = (
     .option("kafka.bootstrap.servers", KAFKA_SERVER)
     .option("subscribe", TOPIC)
     .option("startingOffsets", "earliest")
-    .load())
+    .load()
+)
 
 def get_tfl_schema():
     return ArrayType(StructType([
@@ -70,19 +72,19 @@ def write_output(df, path):
     """Write DataFrame to Parquet in append mode."""
     df.write.mode("append").parquet(path)
 
-
 def process_batch(batch_df, batch_id, output_path):
-    """Process each micro-batch: validate, explode, show, and write."""
+    """Process each micro-batch: validate, explode, log, and write."""
     valid = filter_valid(batch_df)
     events_df = explode_events(valid)
-    events_df.printSchema()
-    events_df.show(5, truncate=False)
+    
+    # Log sample and row count
+    row_count = events_df.count()
+    print(f"=== Batch {batch_id}: {row_count} rows ===")
+    if row_count > 0:
+        print("Sample rows:")
+        events_df.show(5, truncate=False)
+    
     write_output(events_df, output_path)
-
-
-def batch_fn(df, batch_id):
-    process_batch(df, batch_id, INCOMING_PATH)
-
 
 def main():
     """Run Spark streaming consumer for TFL Kafka topic."""
@@ -90,12 +92,9 @@ def main():
     schema = get_tfl_schema()
     parsed_df = parse_json(raw_json_df, schema)
 
-    def batch_fn(df, batch_id):
-        process_batch(df, batch_id, INCOMING_PATH)
-
     query = (
         parsed_df.writeStream
-        .foreachBatch(batch_fn)
+        .foreachBatch(lambda df, batch_id: process_batch(df, batch_id, INCOMING_PATH))
         .option("checkpointLocation", CHECKPOINT_PATH)
         .start()
     )

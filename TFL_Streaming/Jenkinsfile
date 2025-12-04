@@ -23,43 +23,29 @@ pipeline {
             }
         }
 
-        stage('Start Producer') {
+        stage('Run Producer (1 min)') {
             steps {
-                sh '''
-                    spark-submit \
-                      --master local \
-                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
-                      TFL_Streaming/src/producer.py &
-                    echo $! > producer.pid
-                '''
+                timeout(time: 1, unit: 'MINUTES') {
+                    sh '''
+                        spark-submit \
+                          --master local \
+                          --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
+                          TFL_Streaming/src/producer.py
+                    '''
+                }
             }
         }
 
-        stage('Start Consumer') {
+        stage('Run Consumer (1 min)') {
             steps {
-                sh '''
-                    sleep 5
-                    spark-submit \
-                      --master local \
-                      --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-                      TFL_Streaming/src/consumer.py &
-                    echo $! > consumer.pid
-                '''
-            }
-        }
-
-        stage('Run for 60 seconds') {
-            steps {
-                sh 'sleep 60'
-            }
-        }
-
-        stage('Stop Processes') {
-            steps {
-                sh '''
-                    if [ -f producer.pid ]; then kill $(cat producer.pid) || true; fi
-                    if [ -f consumer.pid ]; then kill $(cat consumer.pid) || true; fi
-                '''
+                timeout(time: 1, unit: 'MINUTES') {
+                    sh '''
+                        spark-submit \
+                          --master local \
+                          --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
+                          TFL_Streaming/src/consumer.py
+                    '''
+                }
             }
         }
 
@@ -69,12 +55,6 @@ pipeline {
                     impala-shell -q "REFRESH streaming_tfl_db.tfl_streaming_arrivals;"
                 '''
             }
-        }
-    }
-
-    post {
-        always {
-            sh 'rm -f producer.pid consumer.pid'
         }
     }
 }
