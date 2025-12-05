@@ -10,7 +10,8 @@ load_dotenv()
 
 # Get absolute project root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_PATH = os.path.join(BASE_DIR, "config/dev.yaml")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "dev.yaml")
+
 
 # Load YAML config safely
 with open(CONFIG_PATH, "r") as f:
