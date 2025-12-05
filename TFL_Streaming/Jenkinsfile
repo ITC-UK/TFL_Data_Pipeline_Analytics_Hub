@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    triggers {
+        cron('H/5 * * * *')  // runs pipeline every 5 minutes
+    }
+
+    parameters {
+        booleanParam(name: 'RUN_PRODUCER_ONLY', defaultValue: true, description: 'Run only the producer stage?')
+    }
+
     environment {
         PYSPARK_PYTHON = "/usr/bin/python3"
         PYSPARK_DRIVER_PYTHON = "/usr/bin/python3"
@@ -8,6 +16,7 @@ pipeline {
 
     stages {
         stage('Upgrade pip') {
+            when { expression { !params.RUN_PRODUCER_ONLY } } // skip if only producer run
             steps {
                 sh '''
                     python3 -m pip install --upgrade pip setuptools wheel
@@ -16,6 +25,7 @@ pipeline {
         }
 
         stage('Install Python dependencies') {
+            when { expression { !params.RUN_PRODUCER_ONLY } }
             steps {
                 sh '''
                     python3 -m pip install --user -r TFL_Streaming/requirements.txt
@@ -35,19 +45,8 @@ pipeline {
             }
         }
 
-//         stage('Run Consumer (batch for debugging)') {
-//             steps {
-//                 sh '''
-//                     echo "Running streaming consumer in batch mode (one trigger) to completion..."
-//                     spark-submit \
-//                       --master local \
-//                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-//                       TFL_Streaming/src/consumer.py
-//                 '''
-//             }
-//         }
-
         stage('Start Consumer (streaming)') {
+            when { expression { !params.RUN_PRODUCER_ONLY } }
             steps {
                 sh '''
                     echo "Starting streaming consumer in background..."
@@ -62,6 +61,7 @@ pipeline {
         }
 
         stage('Refresh Impala Metadata') {
+            when { expression { !params.RUN_PRODUCER_ONLY } }
             steps {
                 sh '''
                     impala-shell -q "REFRESH streaming_tfl_db.tfl_streaming_arrivals;"
@@ -72,9 +72,8 @@ pipeline {
 
     post {
         always {
-            // Keep consumer running; just notify pipeline completion
             sh '''
-                echo "Jenkins pipeline finished. Consumer is running in background."
+                echo "Jenkins pipeline finished."
             '''
         }
     }
