@@ -43,7 +43,6 @@ pipeline {
                 sh '''
                     cd TFL_Batch_Processing
                     python3 src/bronze/dataintegration.py full
-                    
                 '''
             }
         }
@@ -77,3 +76,4 @@ pipeline {
 
     }
 }
+
