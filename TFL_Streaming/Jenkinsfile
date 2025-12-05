@@ -23,54 +23,28 @@ pipeline {
             }
         }
 
-        stage('Start Producer') {
+        stage('Run Producer (one-off)') {
             steps {
                 sh '''
-                    mkdir -p logs
-                    nohup spark-submit \
+                    echo "Running single-run TFL producer..."
+                    spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
-                      TFL_Streaming/src/producer.py > logs/producer.log 2>&1 &
-                    echo $! > producer.pid
+                      TFL_Streaming/src/producer.py > logs/producer.log 2>&1
                 '''
             }
         }
 
-        stage('Start Consumer') {
+        stage('Start Consumer (streaming)') {
             steps {
                 sh '''
-                    sleep 5  # give producer a head start
+                    echo "Starting streaming consumer in background..."
                     nohup spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
                       TFL_Streaming/src/consumer.py > logs/consumer.log 2>&1 &
                     echo $! > consumer.pid
-                '''
-            }
-        }
-
-        stage('Run Streaming') {
-            steps {
-                sh '''
-                    echo "Streaming for 60 seconds..."
-                    sleep 60
-                '''
-            }
-        }
-
-        stage('Stop Processes') {
-            steps {
-                sh '''
-                    if [ -f producer.pid ]; then
-                        echo "Stopping producer..."
-                        kill $(cat producer.pid) || true
-                        rm producer.pid
-                    fi
-                    if [ -f consumer.pid ]; then
-                        echo "Stopping consumer..."
-                        kill $(cat consumer.pid) || true
-                        rm consumer.pid
-                    fi
+                    echo "Consumer started with PID $(cat consumer.pid)"
                 '''
             }
         }
@@ -86,9 +60,9 @@ pipeline {
 
     post {
         always {
+            // Do NOT kill the consumer here; we want it to keep running
             sh '''
-                rm -f producer.pid consumer.pid
-                echo "Pipeline cleanup done."
+                echo "Jenkins pipeline finished. Consumer is running in background."
             '''
         }
     }
