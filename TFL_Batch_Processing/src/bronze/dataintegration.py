@@ -8,11 +8,15 @@ import yaml
 # Load environment variables
 load_dotenv()
 
-# Load dev config
-with open("config/dev.yaml", "r") as f:
+# Get absolute project root
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_PATH = os.path.join(BASE_DIR, "config/dev.yaml")
+
+# Load YAML config safely
+with open(CONFIG_PATH, "r") as f:
     config = yaml.safe_load(f)
 
-RAW_DIR = config["paths"]["raw_data"]
+RAW_DIR = os.path.join(BASE_DIR, config["paths"]["raw_data"])
 
 PG_USER = config["postgres"]["user"]
 PG_PASSWORD = quote_plus(os.getenv("PG_PASSWORD"))
