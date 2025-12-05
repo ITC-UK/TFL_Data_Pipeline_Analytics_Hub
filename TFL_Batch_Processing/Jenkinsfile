@@ -17,11 +17,7 @@ pipeline {
             }
         }
 
-        /***************************************************************
-         * 1. DATA EXTRACTION FROM API  
-         * (ENABLE NOW because integration must run after extraction)
-         ***************************************************************/
-        /*
+        //1.DATA EXTRACTION FROM API  (ENABLE NOW because integration must run after extraction)
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
@@ -31,12 +27,8 @@ pipeline {
                 '''
             }
         }
-        */
 
-        /***************************************************************
-         * 2. DATA INTEGRATION (POSTGRES LOAD)
-         * MUST RUN AFTER DATA EXTRACTION
-         ***************************************************************/
+        //2. DATA INTEGRATION (POSTGRES LOAD)
         stage('2. Data Integration (Postgres Load)') {
             steps {
                 echo "Running Data Integration — Loading API data into Postgres..."
@@ -46,7 +38,8 @@ pipeline {
                 '''
             }
         }
-        stage('3. Incremental Ingestion (Sqoop → Hive → HDFS)') {
+        //3. Incremental Data ingestion
+        stage('Incremental Ingestion (Sqoop → Hive → HDFS)') {
             steps {
                 echo "Running Incremental Ingestion Script..."
                 sh '''
@@ -56,10 +49,8 @@ pipeline {
                 '''
             }
         }
-        /***************************************************************
-         * 3. SILVER TRANSFORMATIONS (COMMENTED FOR NOW)
-         ***************************************************************
-        /*
+        
+        //4.SILVER TRANSFORMATIONS (COMMENTED FOR NOW)
         stage('Run Silver Transformations') {
             steps {
                 echo "Running Silver layer Spark transformations..."
@@ -69,21 +60,19 @@ pipeline {
                 '''
             }
         }
-        */
 
-        /***************************************************************
-         * 4. GOLD LAYER (COMMENTED FOR NOW)
-         ***************************************************************
-        /*
-        stage('3. Create Gold Tables (Hive)') {
+        
+        //5. GOLD LAYER (COMMENTED FOR NOW)
+        
+        stage(' Create Gold Tables (Hive)') {
             steps {
                 echo "Running Gold Layer Hive Script..."
                 sh 'cd TFL_Batch_Processing/src/gold && hive -f tfl_gold_layer.hql'
             }
         }
-        */
 
     }
 }
+
 
 
