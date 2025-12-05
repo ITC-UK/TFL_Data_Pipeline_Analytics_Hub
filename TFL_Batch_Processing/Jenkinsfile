@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        PYSPARK_PYTHON = "/usr/bin/python3"
+        PYSPARK_PYTHON        = "/usr/bin/python3"
         PYSPARK_DRIVER_PYTHON = "/usr/bin/python3"
+        SPARK_SUBMIT          = "spark-submit"    // change to spark2-submit if needed
     }
 
     stages {
@@ -11,29 +12,37 @@ pipeline {
         stage('Upgrade pip') {
             steps {
                 sh '''
-                    python3 -m pip install --upgrade pip setuptools wheel
+                    python3 -m pip install --upgrade pip setuptools wheel || true
                 '''
             }
         }
 
-        // --------------------------------------------------
-        // Disabled API Extraction Stage
-        // --------------------------------------------------
-        // stage('1. Data Extraction from API') {
-        //     steps {
-        //         echo "Running API data extraction (3 cycles)..."
-        //         sh 'python3 TFL_Batch_Processing/src/bronze/rawdataextraction.py'
-        //     }
-        // }
-        // --------------------------------------------------
+        /***************************************************************
+         * 1. DATA EXTRACTION FROM API (COMMENTED FOR NOW)
+         * Uncomment later when you want raw extraction to run again.
+         ***************************************************************
+        stage('1. Data Extraction from API') {
+            steps {
+                echo "Running API data extraction (3 cycles)..."
+                sh 'python3 TFL_Batch_Processing/src/bronze/rawdataextraction.py'
+            }
+        }
+        ****************************************************************/
 
         stage('Run Silver Transformations') {
             steps {
-                echo "Running Silver layer transformations..."
-                sh 'python3 TFL_Batch_Processing/src/silver/Transformations.py'
+                echo "Running Silver layer Spark transformations..."
+
+                sh '''
+                    cd TFL_Batch_Processing
+
+                    $SPARK_SUBMIT \
+                        --master yarn \
+                        --deploy-mode client \
+                        src/silver/Transformations.py
+                '''
             }
         }
-
     }
 }
 
