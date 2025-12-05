@@ -36,7 +36,7 @@ PG_HOST = config["postgres"]["host"]
 PG_DB = config["postgres"]["database"]
 PG_PORT = config["postgres"]["port"]
 
-INCREMENTAL_COL = "event_time"   # Change this if your timestamp column is different
+INCREMENTAL_COL = "api_fetch_time"  
 
 
 def get_engine():
