@@ -24,12 +24,18 @@ import yaml
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]  # Ensure logs go to stdout for Jenkins console
 )
 logger = logging.getLogger("tfl-producer")
 
 # --- load config ---
-with open("config/dev.yaml") as f:
-    cfg = yaml.safe_load(f)
+try:
+    with open("config/dev.yaml") as f:
+        cfg = yaml.safe_load(f)
+    logger.info("Loaded config from config/dev.yaml")
+except Exception as e:
+    logger.exception("Failed to load config file")
+    sys.exit(1)
 
 KAFKA_SERVER = cfg["kafka"]["bootstrap_servers"]
 TOPIC = cfg["kafka"]["topic"]
@@ -57,30 +63,39 @@ def create_requests_session(total_retries=5, backoff_factor=0.3, status_forcelis
     adapter = HTTPAdapter(max_retries=retry)
     s.mount("https://", adapter)
     s.mount("http://", adapter)
+    logger.info("Created requests session with retries")
     return s
 
 
 def create_producer(servers):
     """Kafka producer with idempotence + acks=all."""
-    return KafkaProducer(
-        bootstrap_servers=servers,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        key_serializer=lambda k: k.encode("utf-8"),
-        acks="all",
-        retries=5,
-        linger_ms=50,
-        max_in_flight_requests_per_connection=1,
-        enable_idempotence=True,
-    )
+    try:
+        producer = KafkaProducer(
+            bootstrap_servers=servers,
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            key_serializer=lambda k: k.encode("utf-8"),
+            acks="all",
+            retries=5,
+            linger_ms=50,
+            max_in_flight_requests_per_connection=1,
+            enable_idempotence=True,
+        )
+        logger.info(f"KafkaProducer created connected to {servers}")
+        return producer
+    except Exception as e:
+        logger.exception(f"Failed to create KafkaProducer: {e}")
+        sys.exit(1)
 
 
 def fetch_tfl_data(session: requests.Session, api_url: str, app_id: str, app_key: str, timeout=10):
     """Fetch JSON from TFL API."""
     url = f"{api_url}?app_id={app_id}&app_key={app_key}"
-    logger.debug("Fetching %s", url)
+    logger.info(f"Fetching data from {url}")
     resp = session.get(url, timeout=timeout)
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    logger.info(f"Received {len(data)} records from {url}")
+    return data
 
 
 def enrich_events(events: List[Dict], line_name: str) -> List[Dict]:
@@ -97,6 +112,7 @@ def enrich_events(events: List[Dict], line_name: str) -> List[Dict]:
             event["id"] = str(event["id"])
 
         output.append(event)
+    logger.info(f"Enriched {len(output)} events for line {line_name}")
     return output
 
 
@@ -113,6 +129,7 @@ def send_events(producer: KafkaProducer, topic: str, events: List[Dict]):
 
     try:
         producer.flush(timeout=10)
+        logger.info("Kafka producer flush completed")
     except Exception:
         logger.exception("Flush failed")
 
@@ -131,6 +148,7 @@ def poll_and_send_once(producer: KafkaProducer, api_list: Dict, app_id: str, app
             logger.info("[SENT] %s updates: %d", line_name, len(enriched))
         except Exception:
             logger.exception("Failed fetching/sending for %s", line_name)
+    logger.info(f"Total events sent this run: {total}")
     return total
 
 
@@ -143,6 +161,7 @@ def shutdown(producer: KafkaProducer = None):
         try:
             producer.flush(timeout=10)
             producer.close()
+            logger.info("Kafka producer closed successfully")
         except Exception:
             logger.exception("Error closing producer")
     logger.info("Producer stopped.")
@@ -166,6 +185,9 @@ def main():
 
     try:
         poll_and_send_once(producer, API_LIST, TFL_APP_ID, TFL_APP_KEY, session)
+    except Exception:
+        logger.exception("Producer run failed with an exception")
+        sys.exit(1)
     finally:
         shutdown(producer)
 

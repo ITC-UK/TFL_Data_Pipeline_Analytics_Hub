@@ -27,10 +27,11 @@ pipeline {
             steps {
                 sh '''
                     echo "Running single-run TFL producer..."
+                    # Pipe logs to console and save to file
                     spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7","com.lihaoyi:requests_2.11:0.7.1" \
-                      TFL_Streaming/src/producer.py > logs/producer.log 2>&1
+                      TFL_Streaming/src/producer.py 2>&1 | tee logs/producer.log
                 '''
             }
         }
@@ -42,7 +43,7 @@ pipeline {
                     nohup spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-                      TFL_Streaming/src/consumer.py > logs/consumer.log 2>&1 &
+                      TFL_Streaming/src/consumer.py 2>&1 | tee logs/consumer.log &
                     echo $! > consumer.pid
                     echo "Consumer started with PID $(cat consumer.pid)"
                 '''
@@ -60,7 +61,7 @@ pipeline {
 
     post {
         always {
-            // Do NOT kill the consumer here; we want it to keep running
+            // Keep consumer running; just notify pipeline completion
             sh '''
                 echo "Jenkins pipeline finished. Consumer is running in background."
             '''
