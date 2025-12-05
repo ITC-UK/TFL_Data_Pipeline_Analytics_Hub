@@ -1,24 +1,35 @@
 import os
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 import yaml
 
-# Load environment variables
+# Load environment variables (.env)
 load_dotenv()
 
-# Get absolute project root
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-#CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "dev.yaml")
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "dev.yaml")
+# -------------------------------------------------------------------
+# 1. Get absolute project root: TFL_Batch_Processing
+# -------------------------------------------------------------------
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-# Load YAML config safely
+# -------------------------------------------------------------------
+# 2. Load dev.yaml correctly
+# -------------------------------------------------------------------
+CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "dev.yaml")
+
 with open(CONFIG_PATH, "r") as f:
     config = yaml.safe_load(f)
 
-RAW_DIR = os.path.join(BASE_DIR, config["paths"]["raw_data"])
+# -------------------------------------------------------------------
+# 3. Proper RAW data folder path
+#    (always resolves to TFL_Batch_Processing/data/raw)
+# -------------------------------------------------------------------
+RAW_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
 
+# -------------------------------------------------------------------
+# 4. Postgres credentials
+# -------------------------------------------------------------------
 PG_USER = config["postgres"]["user"]
 PG_PASSWORD = quote_plus(os.getenv("PG_PASSWORD"))
 PG_HOST = config["postgres"]["host"]
