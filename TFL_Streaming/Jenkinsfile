@@ -35,6 +35,18 @@ pipeline {
             }
         }
 
+//         stage('Run Consumer (batch for debugging)') {
+//             steps {
+//                 sh '''
+//                     echo "Running streaming consumer in batch mode (one trigger) to completion..."
+//                     spark-submit \
+//                       --master local \
+//                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
+//                       TFL_Streaming/src/consumer.py
+//                 '''
+//             }
+//         }
+
         stage('Start Consumer (streaming)') {
             steps {
                 sh '''
