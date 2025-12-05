@@ -38,7 +38,7 @@ pipeline {
                 '''
             }
         }
-
+       /*
         stage('Incremental Ingestion (Sqoop → Hive → HDFS)') {
             steps {
                 echo "Running Incremental Ingestion Script..."
@@ -72,6 +72,8 @@ pipeline {
                 '''
             }
         }
+        */
 
     }
 }
+
