@@ -57,7 +57,7 @@ def create_requests_session(total_retries=5, backoff_factor=0.3, status_forcelis
         connect=total_retries,
         backoff_factor=backoff_factor,
         status_forcelist=status_forcelist,
-        allowed_methods=frozenset(["GET", "POST"])
+        # allowed_methods=frozenset(["GET", "POST"])  # removed for compatibility
     )
 
     adapter = HTTPAdapter(max_retries=retry)
@@ -65,6 +65,7 @@ def create_requests_session(total_retries=5, backoff_factor=0.3, status_forcelis
     s.mount("http://", adapter)
     logger.info("Created requests session with retries")
     return s
+
 
 
 def create_producer(servers):
