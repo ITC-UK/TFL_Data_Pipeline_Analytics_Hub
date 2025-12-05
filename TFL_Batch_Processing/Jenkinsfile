@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        PYSPARK_PYTHON = "/usr/bin/python3"
+        PYSPARK_DRIVER_PYTHON = "/usr/bin/python3"
+    }
+
     stages {
 
         stage('Checkout Code') {
@@ -15,20 +20,19 @@ pipeline {
             }
         }
 
-        stage('Check Workspace') {
+        stage('Upgrade pip') {
             steps {
-                sh 'pwd'
-                sh 'ls -R .'
+                sh '''
+                    python3 -m pip install --upgrade pip setuptools wheel
+                '''
             }
         }
 
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
-                sh 'python TFL_Batch_Processing/src/bronze/rawdataextraction.py'
+                sh 'python3 TFL_Batch_Processing/src/bronze/rawdataextraction.py'
             }
         }
     }
 }
-
-
