@@ -32,17 +32,19 @@ pipeline {
         stage('Run Silver Transformations') {
             steps {
                 echo "Running Silver layer Spark transformations..."
-
                 sh '''
                     cd TFL_Batch_Processing
-
-                    $SPARK_SUBMIT \
-                        --master yarn \
-                        --deploy-mode client \
-                        src/silver/Transformations.py
+                    spark-submit --master yarn --deploy-mode client src/silver/Transformations.py
                 '''
             }
         }
+
+        stage('3. Create Gold Tables (Hive)') {
+            steps {
+                echo "Running Gold Layer Hive Script..."
+                sh 'cd TFL_Batch_Processing/src/gold && hive -f tfl_gold_layer.hql'
+            }
+        }
+
     }
 }
-
