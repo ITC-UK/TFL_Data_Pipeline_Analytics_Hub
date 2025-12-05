@@ -1,9 +1,10 @@
 import os
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 import yaml
+import sys
 
 # Load environment variables (.env)
 load_dotenv()
