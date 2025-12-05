@@ -1,13 +1,79 @@
 pipeline {
     agent any
 
+    environment {
+        PYSPARK_PYTHON        = "/usr/bin/python3"
+        PYSPARK_DRIVER_PYTHON = "/usr/bin/python3"
+        SPARK_SUBMIT          = "spark-submit"
+    }
+
     stages {
 
+        stage('Upgrade pip') {
+            steps {
+                sh '''
+                    python3 -m pip install --upgrade pip setuptools wheel || true
+                '''
+            }
+        }
+
+        /***************************************************************
+         * 1. DATA EXTRACTION FROM API  
+         * (ENABLE NOW because integration must run after extraction)
+         ***************************************************************/
+        /*
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
-                sh 'python src/bronze/rawdataextraction.py'
+                sh '''
+                    cd TFL_Batch_Processing/src/bronze
+                    python3 rawdataextraction.py
+                '''
             }
         }
+        */
+
+        /***************************************************************
+         * 2. DATA INTEGRATION (POSTGRES LOAD)
+         * MUST RUN AFTER DATA EXTRACTION
+         ***************************************************************/
+        stage('2. Data Integration (Postgres Load)') {
+            steps {
+                echo "Running Data Integration — Loading API data into Postgres..."
+                sh '''
+                    cd TFL_Batch_Processing
+                    python3 src/bronze/dataintegration.py full
+                    
+                '''
+            }
+        }
+
+        /***************************************************************
+         * 3. SILVER TRANSFORMATIONS (COMMENTED FOR NOW)
+         ***************************************************************
+        /*
+        stage('Run Silver Transformations') {
+            steps {
+                echo "Running Silver layer Spark transformations..."
+                sh '''
+                    cd TFL_Batch_Processing
+                    spark-submit --master yarn --deploy-mode client src/silver/Transformations.py
+                '''
+            }
+        }
+        */
+
+        /***************************************************************
+         * 4. GOLD LAYER (COMMENTED FOR NOW)
+         ***************************************************************
+        /*
+        stage('3. Create Gold Tables (Hive)') {
+            steps {
+                echo "Running Gold Layer Hive Script..."
+                sh 'cd TFL_Batch_Processing/src/gold && hive -f tfl_gold_layer.hql'
+            }
+        }
+        */
+
     }
 }
