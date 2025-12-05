@@ -59,7 +59,9 @@ while cycle < max_cycles:
                 df_old = pd.read_csv(file_path)
 
                 df_combined = pd.concat([df_old, df_new], ignore_index=True)
-                df_combined.drop_duplicates(subset=["id"], inplace=True)
+                #df_combined.drop_duplicates(subset=["id"], inplace=True)
+                df_combined.drop_duplicates(subset=["id", "api_fetch_time"], inplace=True)
+
 
                 df_combined.to_csv(file_path, index=False)
                 print(f"Updated {file_path} → {len(df_combined)} rows")
