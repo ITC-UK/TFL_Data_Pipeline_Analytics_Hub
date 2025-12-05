@@ -101,24 +101,24 @@ def write_using_delta(df, target_path):
     """Merge into Delta table by id. Requires delta to be installed."""
     from delta.tables import DeltaTable  # will raise if not present
     delta_path = target_path.rstrip("/")  # delta table path
-    # create table if not exists
-    if not DeltaTable.isDeltaTable(spark, delta_path):
-        logger.info("Creating new Delta table at %s", delta_path)
-        df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(delta_path)
-        return
+    try:
+        if not DeltaTable.isDeltaTable(spark, delta_path):
+            logger.info(f"Creating new Delta table at {delta_path}")
+            df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(delta_path)
+            logger.info(f"Delta table created successfully at {delta_path}")
+            return
 
-    delta_table = DeltaTable.forPath(spark, delta_path)
-
-    # We'll use id as unique key. Only update when incoming record is newer (by _ingest_ts)
-    # Build merge condition and perform upsert
-    merge_cond = "target.id = updates.id"
-    delta_table.alias("target").merge(
-        df.alias("updates"),
-        merge_cond
-    ).whenMatchedUpdateAll(
-    ).whenNotMatchedInsertAll().execute()
-    logger.info("Delta merge completed to %s", delta_path)
-
+        delta_table = DeltaTable.forPath(spark, delta_path)
+        logger.info(f"Merging batch into existing Delta table at {delta_path}")
+        merge_cond = "target.id = updates.id"
+        delta_table.alias("target").merge(
+            df.alias("updates"),
+            merge_cond
+        ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+        logger.info(f"Delta merge completed successfully to {delta_path}")
+    except Exception as e:
+        logger.error(f"Delta write failed at {delta_path}: {e}", exc_info=True)
+        raise
 
 def write_using_parquet_upsert(df, target_base_path):
     """
@@ -131,87 +131,86 @@ def write_using_parquet_upsert(df, target_base_path):
     # collect partitions present in this batch
     parts = df.select("year", "month", "day").distinct().collect()
     partitions = [(int(r.year), int(r.month), int(r.day)) for r in parts]
-    logger.info("Partitions to upsert: %s", partitions)
+    logger.info(f"Partitions to upsert: {partitions}")
     for y, m, d in partitions:
         part_path = os.path.join(target_base_path, f"year={y}/month={m}/day={d}")
+        logger.info(f"Writing partition for {y}-{m}-{d} to {part_path}")
         incoming_part = df.filter((col("year") == y) & (col("month") == m) & (col("day") == d))
-        # read existing if exists
-        if spark._jsparkSession.catalog().tableExists(part_path):
-            # if someone registered tables with this path; in general check path existence instead
-            existing = spark.read.parquet(part_path)
-        else:
-            # safer: check filesystem path
-            from py4j.java_gateway import java_import
-            fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
-            path = spark._jvm.org.apache.hadoop.fs.Path(part_path)
-            if fs.exists(path):
+
+        # Check if partition exists
+        existing = None
+        try:
+            # Try catalog table check first
+            if spark._jsparkSession.catalog().tableExists(part_path):
                 existing = spark.read.parquet(part_path)
             else:
-                existing = None
+                # fallback to filesystem path check
+                from py4j.java_gateway import java_import
+                fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+                path = spark._jvm.org.apache.hadoop.fs.Path(part_path)
+                if fs.exists(path):
+                    existing = spark.read.parquet(part_path)
+        except Exception as e:
+            logger.warning(f"Error checking existing partition at {part_path}: {e}")
 
-        if existing is None:
-            # just write incoming partition
-            incoming_part.write.mode("append").parquet(part_path)
-            logger.info("Wrote new partition %s", part_path)
-        else:
-            # union, dedupe, and overwrite partition
-            combined = existing.unionByName(incoming_part)
-            deduped = combined.dropDuplicates(["id"])
-            # write to a temp path then move (atomic behavior depends on FS)
-            tmp = part_path + "_tmp_" + datetime.utcnow().strftime("%Y%m%d%H%M%S")
-            deduped.write.mode("overwrite").parquet(tmp)
-            # move/replace
-            hadoop_fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
-            dst = spark._jvm.org.apache.hadoop.fs.Path(part_path)
-            src = spark._jvm.org.apache.hadoop.fs.Path(tmp)
-            # remove old then rename tmp -> part_path
-            if hadoop_fs.exists(dst):
-                hadoop_fs.delete(dst, True)
-            hadoop_fs.rename(src, dst)
-            logger.info("Upserted partition %s", part_path)
-
+        try:
+            if existing is None:
+                incoming_part.write.mode("append").parquet(part_path)
+                logger.info(f"Wrote new partition {part_path} successfully")
+            else:
+                combined = existing.unionByName(incoming_part)
+                deduped = combined.dropDuplicates(["id"])
+                tmp = part_path + "_tmp_" + datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                deduped.write.mode("overwrite").parquet(tmp)
+                # move/replace partition atomically
+                hadoop_fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+                dst = spark._jvm.org.apache.hadoop.fs.Path(part_path)
+                src = spark._jvm.org.apache.hadoop.fs.Path(tmp)
+                if hadoop_fs.exists(dst):
+                    hadoop_fs.delete(dst, True)
+                hadoop_fs.rename(src, dst)
+                logger.info(f"Upserted partition {part_path} successfully")
+        except Exception as e:
+            logger.error(f"Failed writing partition {part_path}: {e}", exc_info=True)
+            raise
 
 def foreach_batch_function(batch_df, batch_id):
-    """
-    This runs for each micro-batch. We perform:
-    - parse + flatten
-    - watermark & dedupe using dropDuplicates on 'id'
-    - write to Delta (preferred) or parquet fallback using partition-level upserts
-    """
-    logger.info("Processing batch_id=%s, rows=%d", batch_id, batch_df.count())
+    logger.info(f"Starting processing batch {batch_id} with {batch_df.count()} rows")
     if batch_df.rdd.isEmpty():
         logger.info("Empty batch, skipping")
         return
 
-    # parse & flatten the JSON payload
     raw = batch_df.selectExpr("CAST(value AS STRING) AS json_value")
     flat = parse_and_flatten(raw)
 
-    # watermark + dedupe: requires watermark on event time (expectedArrival)
-    # Use expectedArrival if available, else fallback to ingestion time
+    # watermark + dedupe on event id and event time
     time_col = "expectedArrival"
     candidate = flat.withWatermark(time_col, WATERMARK_DELAY).dropDuplicates(["id"])
 
-    # optional limit (for testing)
     if BATCH_PROCESS_LIMIT:
         candidate = candidate.limit(int(BATCH_PROCESS_LIMIT))
 
-    # target paths
     if PREFERRED_SINK.lower() == "delta":
         try:
-            logger.info("Attempting Delta upsert to %s", INCOMING_PATH)
+            logger.info(f"Attempting Delta upsert to {INCOMING_PATH}")
             write_using_delta(candidate, INCOMING_PATH)
+            logger.info(f"Batch {batch_id} written successfully using Delta")
             return
         except Exception:
             logger.exception("Delta upsert failed, falling back to parquet upsert")
 
-    # fallback to parquet upsert
-    write_using_parquet_upsert(candidate, INCOMING_PATH)
+    # fallback parquet write
+    try:
+        logger.info(f"Attempting parquet upsert to {INCOMING_PATH}")
+        write_using_parquet_upsert(candidate, INCOMING_PATH)
+        logger.info(f"Batch {batch_id} written successfully using Parquet")
+    except Exception:
+        logger.exception("Parquet upsert failed")
 
+    logger.info(f"Finished processing batch {batch_id}")
 
 def main():
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
-    # start streaming with foreachBatch (we will parse inside foreachBatch for consistent batch-level handling)
     query = (
         raw_json_df.writeStream
         .foreachBatch(foreach_batch_function)
@@ -219,9 +218,8 @@ def main():
         .trigger(processingTime="30 seconds")  # tune as required
         .start()
     )
-    logger.info("Started streaming query with checkpoint=%s", CHECKPOINT_PATH)
+    logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
     query.awaitTermination()
-
 
 if __name__ == "__main__":
     main()
