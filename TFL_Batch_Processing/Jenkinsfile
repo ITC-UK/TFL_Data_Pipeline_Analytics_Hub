@@ -28,6 +28,15 @@ pipeline {
             }
         }
         ****************************************************************/
+        stage('2. Data Integration (Postgres Load)') {
+            steps {
+                echo "Running Data Integration — Loading API data into Postgres..."
+                sh '''
+                    cd TFL_Batch_Processing/src/bronze
+                    python3 dataintegration.py full
+                '''
+            }
+        }
 
         stage('Run Silver Transformations') {
             steps {
@@ -48,3 +57,4 @@ pipeline {
 
     }
 }
+
