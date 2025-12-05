@@ -45,17 +45,30 @@ pipeline {
             }
         }
 
+//         stage('Start Consumer (streaming)') {
+//             when { expression { !params.RUN_PRODUCER_ONLY } }
+//             steps {
+//                 sh '''
+//                     echo "Starting streaming consumer in background..."
+//                     nohup spark-submit \
+//                       --master local \
+//                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
+//                       TFL_Streaming/src/consumer.py 2>&1 | tee logs/consumer.log &
+//                     echo $! > consumer.pid
+//                     echo "Consumer started with PID $(cat consumer.pid)"
+//                 '''
+//             }
+//         }
+
         stage('Start Consumer (streaming)') {
             when { expression { !params.RUN_PRODUCER_ONLY } }
             steps {
                 sh '''
-                    echo "Starting streaming consumer in background..."
-                    nohup spark-submit \
+                    echo "Starting streaming consumer (blocking, logs visible in Jenkins)..."
+                    spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-                      TFL_Streaming/src/consumer.py 2>&1 | tee logs/consumer.log &
-                    echo $! > consumer.pid
-                    echo "Consumer started with PID $(cat consumer.pid)"
+                      TFL_Streaming/src/consumer.py 2>&1 | tee logs/consumer.log
                 '''
             }
         }
