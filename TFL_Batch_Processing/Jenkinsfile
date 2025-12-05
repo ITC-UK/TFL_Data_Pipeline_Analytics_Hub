@@ -46,7 +46,16 @@ pipeline {
                 '''
             }
         }
-
+        stage('3. Incremental Ingestion (Sqoop → Hive → HDFS)') {
+            steps {
+                echo "Running Incremental Ingestion Script..."
+                sh '''
+                   cd TFL_Batch_Processing/src/bronze
+                   chmod +x incremental_script.sh
+                   ./incremental_script.sh
+                '''
+            }
+        }
         /***************************************************************
          * 3. SILVER TRANSFORMATIONS (COMMENTED FOR NOW)
          ***************************************************************
@@ -76,4 +85,5 @@ pipeline {
 
     }
 }
+
 
