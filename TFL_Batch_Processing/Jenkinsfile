@@ -38,7 +38,7 @@ pipeline {
                 '''
             }
         }
-       /*
+       
         stage('Incremental Ingestion (Sqoop → Hive → HDFS)') {
             steps {
                 echo "Running Incremental Ingestion Script..."
@@ -50,7 +50,7 @@ pipeline {
                 '''
             }
         }
-
+        /*
         stage('Run Silver Transformations') {
             steps {
                 echo "Running Silver layer Spark transformations..."
@@ -76,4 +76,5 @@ pipeline {
 
     }
 }
+
 
