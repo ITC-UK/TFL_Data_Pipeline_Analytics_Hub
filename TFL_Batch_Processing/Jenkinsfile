@@ -16,12 +16,24 @@ pipeline {
             }
         }
 
-        stage('1. Data Extraction from API') {
+        // --------------------------------------------------
+        // Disabled API Extraction Stage
+        // --------------------------------------------------
+        // stage('1. Data Extraction from API') {
+        //     steps {
+        //         echo "Running API data extraction (3 cycles)..."
+        //         sh 'python3 TFL_Batch_Processing/src/bronze/rawdataextraction.py'
+        //     }
+        // }
+        // --------------------------------------------------
+
+        stage('Run Silver Transformations') {
             steps {
-                echo "Running API data extraction (3 cycles)..."
-                sh 'python3 TFL_Batch_Processing/src/bronze/rawdataextraction.py'
+                echo "Running Silver layer transformations..."
+                sh 'python3 TFL_Batch_Processing/src/silver/Transformations.py'
             }
         }
+
     }
 }
 
