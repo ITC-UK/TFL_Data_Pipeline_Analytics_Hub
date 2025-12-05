@@ -1,0 +1,12 @@
+postgres:
+  host: "18.134.163.221"
+  database: "testdb"
+  user: "admin"
+  port: 5432
+
+paths:
+  raw_data: "./data/raw"
+
+spark:
+  app_name: "TFL_Pipeline_Dev"
+  master: "local[*]"
