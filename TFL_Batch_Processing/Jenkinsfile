@@ -34,7 +34,7 @@ pipeline {
                 echo "Running Data Integration — Loading API data into Postgres..."
                 sh '''
                     cd TFL_Batch_Processing
-                    python3 src/bronze/dataintegration.py full
+                    python3 src/bronze/dataintegration.py inc
                 '''
             }
         }
@@ -73,6 +73,7 @@ pipeline {
 
     }
 }
+
 
 
 
