@@ -3,6 +3,25 @@ pipeline {
 
     stages {
 
+        stage('Checkout Code') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/ITC-UK/TFL_Data_Pipeline_Analytics_Hub.git'
+                    ]]
+                ])
+            }
+        }
+
+        stage('Check Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -R .'
+            }
+        }
+
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
@@ -11,4 +30,5 @@ pipeline {
         }
     }
 }
+
 
