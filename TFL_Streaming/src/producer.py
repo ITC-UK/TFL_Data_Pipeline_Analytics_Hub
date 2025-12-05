@@ -67,7 +67,6 @@ def create_requests_session(total_retries=5, backoff_factor=0.3, status_forcelis
     return s
 
 
-
 def create_producer(servers):
     """Kafka producer with idempotence + acks=all."""
     try:
@@ -79,7 +78,7 @@ def create_producer(servers):
             retries=5,
             linger_ms=50,
             max_in_flight_requests_per_connection=1,
-            enable_idempotence=True,
+            # enable_idempotence=True,  # removed for compatibility
         )
         logger.info(f"KafkaProducer created connected to {servers}")
         return producer
