@@ -174,14 +174,15 @@ def write_using_parquet_upsert(df, target_base_path):
             logger.error(f"Failed writing partition {part_path}: {e}", exc_info=True)
             raise
 
+
 def foreach_batch_function(batch_df, batch_id):
     logger.info(f"Starting processing batch {batch_id} with {batch_df.count()} rows")
     if batch_df.rdd.isEmpty():
         logger.info("Empty batch, skipping")
         return
 
-    raw = batch_df.selectExpr("CAST(value AS STRING) AS json_value")
-    flat = parse_and_flatten(raw)
+    # batch_df already has 'json_value' as STRING, no need to cast again
+    flat = parse_and_flatten(batch_df)
 
     # watermark + dedupe on event id and event time
     time_col = "expectedArrival"
@@ -209,6 +210,8 @@ def foreach_batch_function(batch_df, batch_id):
 
     logger.info(f"Finished processing batch {batch_id}")
 
+
+# Commented version for continuous streaming with trigger(processingTime)
 # def main():
 #     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
 #     query = (
@@ -221,13 +224,14 @@ def foreach_batch_function(batch_df, batch_id):
 #     logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
 #     query.awaitTermination()
 
+
 def main():
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
     query = (
         raw_json_df.writeStream
         .foreachBatch(foreach_batch_function)
         .option("checkpointLocation", CHECKPOINT_PATH)
-        # Instead of awaitTermination(), use trigger once:
+        # trigger once for batch processing and immediate completion
         .trigger(once=True)
         .start()
     )
