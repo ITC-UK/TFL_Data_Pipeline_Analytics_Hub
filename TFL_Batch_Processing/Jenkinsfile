@@ -21,6 +21,7 @@ pipeline {
          * 1. DATA EXTRACTION FROM API  
          * (ENABLE NOW because integration must run after extraction)
          ***************************************************************/
+        /*
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
@@ -30,6 +31,7 @@ pipeline {
                 '''
             }
         }
+        */
 
         /***************************************************************
          * 2. DATA INTEGRATION (POSTGRES LOAD)
@@ -40,7 +42,7 @@ pipeline {
                 echo "Running Data Integration — Loading API data into Postgres..."
                 sh '''
                     cd TFL_Batch_Processing/src/bronze
-                    python3 dataintegration.py full
+                    python3 src/bronze/dataintegration.py full
                 '''
             }
         }
@@ -74,3 +76,4 @@ pipeline {
 
     }
 }
+
