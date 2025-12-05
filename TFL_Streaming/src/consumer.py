@@ -212,31 +212,31 @@ def foreach_batch_function(batch_df, batch_id):
 
 
 # Commented version for continuous streaming with trigger(processingTime)
-# def main():
-#     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
-#     query = (
-#         raw_json_df.writeStream
-#         .foreachBatch(foreach_batch_function)
-#         .option("checkpointLocation", CHECKPOINT_PATH)
-#         .trigger(processingTime="30 seconds")  # tune as required
-#         .start()
-#     )
-#     logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
-#     query.awaitTermination()
-
-
 def main():
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
     query = (
         raw_json_df.writeStream
         .foreachBatch(foreach_batch_function)
         .option("checkpointLocation", CHECKPOINT_PATH)
-        # trigger once for batch processing and immediate completion
-        .trigger(once=True)
+        .trigger(processingTime="30 seconds")  # tune as required
         .start()
     )
     logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
     query.awaitTermination()
+
+
+# def main():
+#     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
+#     query = (
+#         raw_json_df.writeStream
+#         .foreachBatch(foreach_batch_function)
+#         .option("checkpointLocation", CHECKPOINT_PATH)
+#         # trigger once for batch processing and immediate completion
+#         .trigger(once=True)
+#         .start()
+#     )
+#     logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
+#     query.awaitTermination()
 
 
 if __name__ == "__main__":

@@ -35,14 +35,16 @@ pipeline {
             }
         }
 
-        stage('Run Consumer (batch for debugging)') {
+        stage('Start Consumer (streaming)') {
             steps {
                 sh '''
-                    echo "Running streaming consumer in batch mode (one trigger) to completion..."
-                    spark-submit \
+                    echo "Starting streaming consumer in background..."
+                    nohup spark-submit \
                       --master local \
                       --packages "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.7" \
-                      TFL_Streaming/src/consumer.py
+                      TFL_Streaming/src/consumer.py 2>&1 | tee logs/consumer.log &
+                    echo $! > consumer.pid
+                    echo "Consumer started with PID $(cat consumer.pid)"
                 '''
             }
         }
