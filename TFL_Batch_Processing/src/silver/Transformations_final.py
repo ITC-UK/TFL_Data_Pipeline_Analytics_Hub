@@ -13,6 +13,19 @@ from pyspark.sql.functions import (
 )
 from functools import reduce
 
+# ============================================================
+# HIVE BRONZE TABLES
+# ============================================================
+RAW_DB = "batchprocessing_tfl_db"
+
+raw_tables = {
+    "bakerloo":     "tfl_bakerloo_lines_raw",
+    "central":      "tfl_central_lines_raw",
+    "metropolitan": "tfl_metropolitan_lines_raw",
+    "northern":     "tfl_northern_lines_raw",
+    "piccadilly":   "tfl_piccadilly_lines_raw",
+    "victoria":     "tfl_victoria_lines_raw"
+}
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
 
 line_groups = [
@@ -23,7 +36,6 @@ line_groups = [
     "piccadilly",
     "victoria"
 ]
-
 silver_path = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
 
 SILVER_COLS = [
@@ -32,6 +44,7 @@ SILVER_COLS = [
     "event_time","timetostation","currentlocation","towards",
     "expectedarrival_ts","train_type"
 ]
+cleaned_dfs = []
 
 def align_and_union(df1, df2):
     """Union two DataFrames with different schemas"""
@@ -50,8 +63,6 @@ spark = (
     .getOrCreate()
 )
 
-cleaned_dfs = []
-
 for line_group in line_groups:
     # Load ALL run_* folders, ANY part files inside
     path = f"{BRONZE_BASE}/TFL_{line_group}_lines/run_*/*"
@@ -64,21 +75,6 @@ for line_group in line_groups:
         .option("mode", "DROPMALFORMED")
         .csv(path)
     )
-
-    # Rename columns automatically (Spark may generate col_0, col_1…)
-    # Read the first line of data to determine original CSV header length
-    # Your Bronze files ALWAYS have 30 columns so enforce consistent naming:
-    raw_cols = [
-        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
-        "lineid","linename","platformname","direction","bearing","destinationnaptanid",
-        "destinationname","timestamp_str","timetostation","currentlocation","towards",
-        "expectedarrival","timetolive","modename","timing_type1","timing_type2",
-        "timing_countdownserveradjustment","timing_source","timing_insert",
-        "timing_read","timing_sent","timing_received","api_fetch_time"
-    ]
-
-    for i, colname in enumerate(df.columns):
-        df = df.withColumnRenamed(colname, raw_cols[i])
 
     # CLEAN STRING FIELDS
     df = (
@@ -93,22 +89,26 @@ for line_group in line_groups:
 
     # TIMESTAMP FIXING
     df = df.withColumn(
-        "event_time",
-        when(col("timestamp_str").rlike("\\.\\d+Z$"),
-            to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
-                         "yyyy-MM-dd'T'HH:mm:ss.SSS")
-        ).otherwise(
-            to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
-                         "yyyy-MM-dd'T'HH:mm:ss")
+    "event_time",
+    when(
+        col("timestamp_str").rlike("\\.\\d+Z$"),     # has fractional seconds
+        to_timestamp(
+            regexp_replace(col("timestamp_str"), "Z$", ""),
+            "yyyy-MM-dd'T'HH:mm:ss.SSS"
         )
-    )
-
+    ).otherwise(
+        to_timestamp(
+            regexp_replace(col("timestamp_str"), "Z$", ""),
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
+    ))
     df = df.withColumn(
         "expectedarrival_ts",
-        to_timestamp(regexp_replace(col("expectedarrival"), "Z$", ""),
-                     "yyyy-MM-dd'T'HH:mm:ss")
+        to_timestamp(
+            regexp_replace(col("expectedarrival"), "Z$", ""),
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
     )
-
     # SAFE CAST
     df = df.withColumn(
         "timetostation",
