@@ -13,7 +13,7 @@ HIVE_DATABASE="batchprocessing_tfl_db"
 HIVE_URL="jdbc:hive2://ip-172-31-14-3.eu-west-2.compute.internal:10000/${HIVE_DATABASE}"
 
 # HDFS Base Directory
-BASE_HDFS="/tmp/DE011025/TFL_Batch_processing/raw"
+BASE_HDFS="/tmp/DE011025/TFL_Batch_processing/bronze"
 
 # TFL Lines List
 declare -a TFL_LINES=(
