@@ -16,7 +16,7 @@ pipeline {
                 '''
             }
         }
-       
+       /*
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
@@ -38,7 +38,7 @@ pipeline {
                 '''
             }
         }
-       
+       */
         stage('Incremental Ingestion (Sqoop → Hive → HDFS)') {
             steps {
                 echo "Running Incremental Ingestion Script..."
@@ -89,6 +89,7 @@ pipeline {
 
     }
 }
+
 
 
 
