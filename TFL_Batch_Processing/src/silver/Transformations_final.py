@@ -20,7 +20,7 @@ from functools import reduce
 #  PATHS
 # ======================================================
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
-SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental1"
+SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
 
 # ======================================================
 #  LINE GROUPS
@@ -190,39 +190,41 @@ for line_group in line_groups:
         )
     )
 
-    # Cast int safely
+   # SAFE CASTS (important!)
     df = df.withColumn("id", col("id").cast("bigint"))
     df = df.withColumn("vehicleid", col("vehicleid").cast("int"))
     df = df.withColumn("naptanid", col("naptanid").cast("string"))
+
     df = df.withColumn(
         "timetostation",
         when(trim(col("timetostation").cast("string")).rlike("^[0-9]+$"),
              col("timetostation").cast("int"))
         .otherwise(lit(None))
     )
-    
+
     # Direction fill
     df = df.withColumn(
         "direction",
         when(col("direction").isNull() | (col("direction") == ""),
-             when(lower(col("platformname")).contains("east"), "eastbound")
-             .when(lower(col("platformname")).contains("west"), "westbound")
-             .when(lower(col("platformname")).contains("north"), "northbound")
-             .when(lower(col("platformname")).contains("south"), "southbound")
-             .otherwise(col("direction"))
+            when(lower(col("platformname")).contains("east"), "eastbound")
+            .when(lower(col("platformname")).contains("west"), "westbound")
+            .when(lower(col("platformname")).contains("north"), "northbound")
+            .when(lower(col("platformname")).contains("south"), "southbound")
+            .otherwise(col("direction"))
         ).otherwise(col("direction"))
     )
 
-    df = df.withColumn("train_type",
-                       when(col("vehicleid").isNotNull(), "real")
-                       .otherwise("predicted"))
+    # Train Type
+    df = df.withColumn(
+        "train_type",
+        when(col("vehicleid").isNotNull(), "real").otherwise("predicted")
+    )
 
     df = df.withColumn("line_group", lit(line_group))
 
     df = df.dropDuplicates(["id", "stationname", "event_time"])
 
-    row_count = df.count()
-    print(f"✔ {line_group} rows after cleaning: {row_count}")
+    print(f"✔ {line_group} rows after cleaning: {df.count()}")
 
     cleaned_dfs.append(df)
 
