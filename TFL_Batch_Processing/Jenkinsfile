@@ -87,18 +87,9 @@ pipeline {
             }
         }
 
-    stage('Repair Hive Partitions (Gold)') {
-        steps {
-            sh '''
-                beeline -u "jdbc:hive2://ip-172-31-14-3.../batchprocessing_tfl_db" -e "
-                    MSCK REPAIR TABLE tfl_gold_table5;
-                "
-            '''
-        }
-    }
-
     }
 }
+
 
 
 
