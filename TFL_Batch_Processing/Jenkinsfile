@@ -78,30 +78,28 @@ pipeline {
             }
         }
 
-        stage('Repair Hive Partitions (Silver)') {
+        stage('Create Gold Table (Hive)') {
             steps {
-                echo "Repairing Silver Hive partitions..."
                 sh '''
-                    beeline -u "jdbc:hive2://ip-172-31-14-3.eu-west-2.compute.internal:10000/batchprocessing_tfl_db" -e "
-                        MSCK REPAIR TABLE tfl_gold_table5;
-                    "
-                '''
-            }
-        }
-
-        stage('Create Gold Tables (Hive)') {
-            steps {
-                echo "Running Gold Layer Hive Script..."
-                sh '''
-                    set -e
                     cd TFL_Batch_Processing/src/gold
                     hive -f tfl_gold_layer.hql
                 '''
             }
         }
 
+    stage('Repair Hive Partitions (Gold)') {
+        steps {
+            sh '''
+                beeline -u "jdbc:hive2://ip-172-31-14-3.../batchprocessing_tfl_db" -e "
+                    MSCK REPAIR TABLE tfl_gold_table5;
+                "
+            '''
+        }
+    }
+
     }
 }
+
 
 
 
