@@ -1,32 +1,120 @@
+# -*- coding: utf-8 -*-
+"""
+TFL SILVER TRANSFORMATION (PRODUCTION SAFE VERSION)
+Handles:
+ - Different column orders for each TFL line
+ - Layout-aware renaming
+ - Timestamp parsing
+ - Schema alignment
+ - Row-count reporting
+"""
+
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, trim, lower, when, lit, regexp_replace, to_timestamp
+from pyspark.sql.functions import (
+    col, trim, lower, when, lit,
+    regexp_replace, to_timestamp
+)
 from functools import reduce
 
+# ======================================================
+#  PATHS
+# ======================================================
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
+SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
 
-line_groups = ["bakerloo","central","metropolitan","northern","piccadilly","victoria"]
+# ======================================================
+#  LINE GROUPS
+# ======================================================
+line_groups = [
+    "bakerloo",
+    "central",
+    "metropolitan",
+    "northern",
+    "piccadilly",
+    "victoria"
+]
 
-silver_path = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
-
+# ======================================================
+#  STANDARD SILVER OUTPUT SCHEMA
+# ======================================================
 SILVER_COLS = [
     "id","vehicleid","naptanid","stationname","lineid","linename","line_group",
     "platformname","direction","destinationnaptanid","destinationname",
     "event_time","timetostation","currentlocation","towards",
     "expectedarrival_ts","train_type"
 ]
-'''
-raw_cols = [
-    "type","type2","id","operationtype","vehicleid","naptanid","stationname",
-    "lineid","linename","platformname","direction","bearing",
-    "destinationnaptanid","destinationname","timestamp_str",
-    "timetostation","currentlocation","towards",
-    "expectedarrival","timetolive","modename",
-    "timing_type1","timing_type2","timing_countdownserveradjustment",
-    "timing_source","timing_insert","timing_read","timing_sent",
-    "timing_received","api_fetch_time"
-]
-'''
 
+# ======================================================
+# COLUMN ORDER FOR EACH LINE GROUP
+#  (MUST MATCH EXACT RAW CSV ORDER)
+# ======================================================
+COLUMN_LAYOUTS = {
+
+    "bakerloo": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","direction","bearing",
+        "destinationnaptanid","destinationname","timestamp_str",
+        "timetostation","currentlocation","towards","expectedarrival",
+        "timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received","api_fetch_time"
+    ],
+
+    "central": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","direction","bearing",
+        "destinationnaptanid","destinationname","timestamp_str",
+        "timetostation","currentlocation","towards","expectedarrival",
+        "timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received","api_fetch_time"
+    ],
+
+    "metropolitan": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","bearing",
+        "timestamp_str","timetostation","currentlocation","towards",
+        "expectedarrival","timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received",
+        "destinationnaptanid","destinationname","direction","api_fetch_time"
+    ],
+
+    "northern": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","direction","bearing",
+        "destinationnaptanid","destinationname","timestamp_str",
+        "timetostation","currentlocation","towards","expectedarrival",
+        "timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received","api_fetch_time"
+    ],
+
+    "piccadilly": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","direction","bearing",
+        "destinationnaptanid","destinationname","timestamp_str",
+        "timetostation","currentlocation","towards","expectedarrival",
+        "timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received","api_fetch_time"
+    ],
+
+    "victoria": [
+        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","bearing",
+        "destinationnaptanid","destinationname","timestamp_str",
+        "timetostation","currentlocation","towards","expectedarrival",
+        "timetolive","modename","timing_type1",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received",
+        "direction","api_fetch_time"
+    ]
+}
+
+# ======================================================
+# SAFE UNION (Spark 2.4 Compatible)
+# ======================================================
 def align_and_union(df1, df2):
     cols = list(set(df1.columns) | set(df2.columns))
     for c in cols:
@@ -36,62 +124,122 @@ def align_and_union(df1, df2):
             df2 = df2.withColumn(c, lit(None))
     return df1.select(sorted(cols)).union(df2.select(sorted(cols)))
 
-spark = SparkSession.builder.appName("Silver").getOrCreate()
+# ======================================================
+# SPARK SESSION
+# ======================================================
+spark = (
+    SparkSession.builder
+    .appName("TFL_Silver_Full_Pipeline")
+    .enableHiveSupport()
+    .getOrCreate()
+)
 
 cleaned_dfs = []
 
+print("\n================ SILVER TRANSFORMATION STARTED ================\n")
+
+# ======================================================
+# PROCESS EACH LINE GROUP
+# ======================================================
 for line_group in line_groups:
+    print(f"\n--- Processing line group: {line_group} ---")
+
+    layout = COLUMN_LAYOUTS[line_group]
     path = f"{BRONZE_BASE}/TFL_{line_group}_lines/run_*/*"
 
-    df = spark.read.option("header","false").option("inferSchema","true").csv(path)
+    print(f"Reading files from: {path}")
 
-    # Rename raw CSV columns
-    #for i, c in enumerate(df.columns):
-        #df = df.withColumnRenamed(c, raw_cols[i])
-
-    # Clean strings
     df = (
-        df.withColumn("stationname", trim(col("stationname")))
-          .withColumn("linename", trim(col("linename")))
-          .withColumn("platformname", trim(col("platformname")))
-          .withColumn("destinationname", trim(col("destinationname")))
-          .withColumn("currentlocation", trim(col("currentlocation")))
-          .withColumn("towards", trim(col("towards")))
+        spark.read
+        .option("header", "false")
+        .option("mode", "DROPMALFORMED")
+        .csv(path)
     )
 
-    # Convert timestamps
+    # Fix columns to match expected layout
+    raw_cols = df.columns
+    if len(raw_cols) < len(layout):
+        for i in range(len(raw_cols), len(layout)):
+            df = df.withColumn(f"_missing_{i}", lit(None))
+        raw_cols = df.columns
+
+    df = df.select(raw_cols[:len(layout)]).toDF(*layout)
+
+    # Clean strings
+    for c in ["stationname", "linename", "platformname", "direction",
+              "destinationname", "currentlocation", "towards"]:
+        df = df.withColumn(c, trim(col(c)))
+
+    # Timestamp parsing
     df = df.withColumn(
         "event_time",
-        to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""), "yyyy-MM-dd'T'HH:mm:ss.SSS")
+        when(col("timestamp_str").rlike("\\.\\d+Z$"),
+             to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss.SSS"))
+        .otherwise(
+            to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss")
+        )
     )
 
     df = df.withColumn(
         "expectedarrival_ts",
-        to_timestamp(regexp_replace(col("expectedarrival"), "Z$", ""), "yyyy-MM-dd'T'HH:mm:ss")
+        to_timestamp(
+            regexp_replace(col("expectedarrival"), "Z$", ""),
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
     )
 
-    # Safe cast
+    # Cast int safely
     df = df.withColumn(
         "timetostation",
-        when(col("timetostation").cast("string").rlike("^[0-9]+$"),
-             col("timetostation").cast("int")).otherwise(None)
+        when(trim(col("timetostation").cast("string")).rlike("^[0-9]+$"),
+             col("timetostation").cast("int"))
+        .otherwise(lit(None))
     )
 
-    # Train type
-    df = df.withColumn("train_type", when(col("vehicleid").isNotNull(), "real").otherwise("predicted"))
+    # Direction fill
+    df = df.withColumn(
+        "direction",
+        when(col("direction").isNull() | (col("direction") == ""),
+             when(lower(col("platformname")).contains("east"), "eastbound")
+             .when(lower(col("platformname")).contains("west"), "westbound")
+             .when(lower(col("platformname")).contains("north"), "northbound")
+             .when(lower(col("platformname")).contains("south"), "southbound")
+             .otherwise(col("direction"))
+        ).otherwise(col("direction"))
+    )
+
+    df = df.withColumn("train_type",
+                       when(col("vehicleid").isNotNull(), "real")
+                       .otherwise("predicted"))
 
     df = df.withColumn("line_group", lit(line_group))
 
-    df = df.dropDuplicates(["id","stationname","event_time"])
+    df = df.dropDuplicates(["id", "stationname", "event_time"])
+
+    row_count = df.count()
+    print(f"✔ {line_group} rows after cleaning: {row_count}")
 
     cleaned_dfs.append(df)
 
-# Merge all lines
+# ======================================================
+# UNION & FINAL SCHEMA ENFORCEMENT
+# ======================================================
 df_silver = reduce(align_and_union, cleaned_dfs)
 
-# Ensure column order
+for c in SILVER_COLS:
+    if c not in df_silver.columns:
+        df_silver = df_silver.withColumn(c, lit(None))
+
 df_silver = df_silver.select(SILVER_COLS)
 
-df_silver.coalesce(6).write.mode("overwrite").partitionBy("line_group").parquet(silver_path)
+# ======================================================
+# WRITE SILVER
+# ======================================================
+df_silver.coalesce(6).write.mode("overwrite") \
+    .partitionBy("line_group") \
+    .parquet(SILVER_PATH)
 
-print("SILVER READY:", silver_path)
+print("\n================ SILVER TRANSFORMATION COMPLETED ================\n")
+print("Output written to:", SILVER_PATH)
