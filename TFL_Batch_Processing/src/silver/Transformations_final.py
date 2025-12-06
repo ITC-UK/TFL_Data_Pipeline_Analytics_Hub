@@ -2,8 +2,9 @@
 """
 TFL SILVER TRANSFORMATION
 Reads ALL bronze run folders (full + incremental)
-Handles schema differences automatically
-Works with part, part-*, and any file format inside run_*.
+Automatically detects column order from first row
+Handles schema drift safely
+Works with any part/part-* file
 """
 
 from pyspark.sql import SparkSession
@@ -13,74 +14,103 @@ from pyspark.sql.functions import (
 )
 from functools import reduce
 
+# -------------------------------------------------------------------
+# BRONZE + SILVER PATHS
+# -------------------------------------------------------------------
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
+SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
 
 line_groups = [
-    "bakerloo",
-    "central",
-    "metropolitan",
-    "northern",
-    "piccadilly",
-    "victoria"
+    "bakerloo", "central", "metropolitan",
+    "northern", "piccadilly", "victoria"
 ]
 
-silver_path = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
+# -------------------------------------------------------------------
+# EXPECTED COLUMN NAMES (official TFL API structure)
+# -------------------------------------------------------------------
+EXPECTED_COLS = [
+    "type", "type2", "id", "operationtype", "vehicleid", "naptanid",
+    "stationname", "lineid", "linename", "platformname", "direction",
+    "bearing", "destinationnaptanid", "destinationname",
+    "timestamp_str", "timetostation", "currentlocation", "towards",
+    "expectedarrival", "timetolive", "modename", "timing_type1",
+    "timing_type2", "timing_countdownserveradjustment", "timing_source",
+    "timing_insert", "timing_read", "timing_sent", "timing_received",
+    "api_fetch_time"
+]
 
 SILVER_COLS = [
-    "id","vehicleid","naptanid","stationname","lineid","linename","line_group",
-    "platformname","direction","destinationnaptanid","destinationname",
-    "event_time","timetostation","currentlocation","towards",
-    "expectedarrival_ts","train_type"
+    "id","vehicleid","naptanid","stationname","lineid","linename",
+    "line_group","platformname","direction","destinationnaptanid",
+    "destinationname","event_time","timetostation","currentlocation",
+    "towards","expectedarrival_ts","train_type"
 ]
 
+# -------------------------------------------------------------------
+# AUTO-REORDER COLUMNS BASED ON EXPECTED STRUCTURE
+# -------------------------------------------------------------------
+def reorder_columns(df):
+    """
+    Spark infers schema differently for each file.
+    This aligns columns to expected structure using index position.
+    """
+    current_cols = df.columns
+    mapping = {}
+
+    for i, actual_col in enumerate(current_cols):
+        if i < len(EXPECTED_COLS):
+            mapping[actual_col] = EXPECTED_COLS[i]
+
+    # Apply renaming
+    for actual, expected in mapping.items():
+        df = df.withColumnRenamed(actual, expected)
+
+    return df
+
+# -------------------------------------------------------------------
+# UNION WITH SCHEMA ALIGNMENT
+# -------------------------------------------------------------------
 def align_and_union(df1, df2):
-    """Union two DataFrames with different schemas"""
-    columns = list(set(df1.columns) | set(df2.columns))
-    for c in columns:
+    all_cols = list(set(df1.columns) | set(df2.columns))
+    for c in all_cols:
         if c not in df1.columns:
             df1 = df1.withColumn(c, lit(None))
         if c not in df2.columns:
             df2 = df2.withColumn(c, lit(None))
-    return df1.select(sorted(columns)).union(df2.select(sorted(columns)))
+    return df1.select(sorted(all_cols)).union(df2.select(sorted(all_cols)))
 
+# -------------------------------------------------------------------
+# START SPARK
+# -------------------------------------------------------------------
 spark = (
     SparkSession.builder
-    .appName("TFL_Silver_Transformation")
+    .appName("TFL_Silver_Transformation_V2")
     .enableHiveSupport()
     .getOrCreate()
 )
 
 cleaned_dfs = []
 
+# -------------------------------------------------------------------
+# PROCESS EACH LINE GROUP
+# -------------------------------------------------------------------
 for line_group in line_groups:
-    # Load ALL run_* folders, ANY part files inside
+
     path = f"{BRONZE_BASE}/TFL_{line_group}_lines/run_*/*"
-    print("Reading:", path)
+    print("\n📌 Reading Bronze Files:", path)
 
     df = (
         spark.read
         .option("header", "false")
-        .option("inferSchema", "true")       # << Auto-detect schema differences
+        .option("inferSchema", "true")
         .option("mode", "DROPMALFORMED")
         .csv(path)
     )
 
-    # Rename columns automatically (Spark may generate col_0, col_1…)
-    # Read the first line of data to determine original CSV header length
-    # Your Bronze files ALWAYS have 30 columns so enforce consistent naming:
-    raw_cols = [
-        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
-        "lineid","linename","platformname","direction","bearing","destinationnaptanid",
-        "destinationname","timestamp_str","timetostation","currentlocation","towards",
-        "expectedarrival","timetolive","modename","timing_type1","timing_type2",
-        "timing_countdownserveradjustment","timing_source","timing_insert",
-        "timing_read","timing_sent","timing_received","api_fetch_time"
-    ]
+    # Reorder based on expected TFL structure
+    df = reorder_columns(df)
 
-    for i, colname in enumerate(df.columns):
-        df = df.withColumnRenamed(colname, raw_cols[i])
-
-    # CLEAN STRING FIELDS
+    # Clean strings
     df = (
         df.withColumn("stationname", trim(col("stationname")))
           .withColumn("linename", trim(col("linename")))
@@ -91,31 +121,31 @@ for line_group in line_groups:
           .withColumn("towards", trim(col("towards")))
     )
 
-     # ---------------- TIMESTAMPS ------------------
+    # EVENT TIME FIX
     df = df.withColumn(
-    "event_time",
-    when(
-        col("timestamp_str").rlike("\\.\\d+Z$"),     # has fractional seconds
-        to_timestamp(
-            regexp_replace(col("timestamp_str"), "Z$", ""),
-            "yyyy-MM-dd'T'HH:mm:ss.SSS"
-        )
-    ).otherwise(
-        to_timestamp(
-            regexp_replace(col("timestamp_str"), "Z$", ""),
-            "yyyy-MM-dd'T'HH:mm:ss"
-        )
-    ))
-    df = df.withColumn(
-        "expectedarrival_ts",
-        to_timestamp(
-            regexp_replace(col("expectedarrival"), "Z$", ""),
-            "yyyy-MM-dd'T'HH:mm:ss"
+        "event_time",
+        when(col("timestamp_str").rlike("\\.\\d+Z$"),
+             to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss.SSS"))
+        .otherwise(
+             to_timestamp(regexp_replace(col("timestamp_str"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss")
         )
     )
 
+    # EXPECTED ARRIVAL FIX (IMPORTANT!)
+    df = df.withColumn(
+        "expectedarrival_ts",
+        when(col("expectedarrival").rlike("\\.\\d+Z$"),
+             to_timestamp(regexp_replace(col("expectedarrival"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss.SSS"))
+        .otherwise(
+             to_timestamp(regexp_replace(col("expectedarrival"), "Z$", ""),
+                          "yyyy-MM-dd'T'HH:mm:ss")
+        )
+    )
 
-    # SAFE CAST
+    # FIX TIMETOSTATION
     df = df.withColumn(
         "timetostation",
         when(trim(col("timetostation").cast("string")).rlike("^[0-9]+$"),
@@ -123,7 +153,7 @@ for line_group in line_groups:
         .otherwise(lit(None))
     )
 
-    # DIRECTION FIX
+    # HANDLE MISSING DIRECTION
     df = df.withColumn(
         "direction",
         when(
@@ -150,17 +180,22 @@ for line_group in line_groups:
 
     cleaned_dfs.append(df)
 
-# UNION ALL LINES
+# -------------------------------------------------------------------
+# MERGE ALL LINES INTO ONE SILVER TABLE
+# -------------------------------------------------------------------
 df_silver = reduce(align_and_union, cleaned_dfs)
 
-# ENSURE COLUMN ORDER
+# ENFORCE FINAL COLUMN ORDER
 for c in SILVER_COLS:
     if c not in df_silver.columns:
         df_silver = df_silver.withColumn(c, lit(None))
 
 df_silver = df_silver.select(SILVER_COLS)
 
+# -------------------------------------------------------------------
 # WRITE SILVER
-df_silver.coalesce(6).write.mode("overwrite").partitionBy("line_group").parquet(silver_path)
+# -------------------------------------------------------------------
+df_silver.coalesce(6).write.mode("overwrite").partitionBy("line_group").parquet(SILVER_PATH)
 
-print("Silver Ready:", silver_path)
+print("\n🌟 SILVER LAYER READY!")
+print("📂 Output:", SILVER_PATH)
