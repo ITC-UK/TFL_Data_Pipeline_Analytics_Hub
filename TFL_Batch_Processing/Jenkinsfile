@@ -50,6 +50,21 @@ pipeline {
                 '''
             }
         }
+        stage('4. Repair Hive Partitions (Raw Tables)') {
+        steps {
+            echo "Running MSCK REPAIR TABLE on all RAW tables..."
+            sh '''
+                beeline -u "jdbc:hive2://ip-172-31-14-3.eu-west-2.compute.internal:10000/batchprocessing_tfl_db" -e "
+                    MSCK REPAIR TABLE tfl_bakerloo_lines_raw;
+                    MSCK REPAIR TABLE tfl_central_lines_raw;
+                    MSCK REPAIR TABLE tfl_metropolitan_lines_raw;
+                    MSCK REPAIR TABLE tfl_northern_lines_raw;
+                    MSCK REPAIR TABLE tfl_piccadilly_lines_raw;
+                    MSCK REPAIR TABLE tfl_victoria_lines_raw;
+                "
+            '''
+        }
+    }
         /*
         stage('Run Silver Transformations') {
             steps {
@@ -76,5 +91,6 @@ pipeline {
 
     }
 }
+
 
 
