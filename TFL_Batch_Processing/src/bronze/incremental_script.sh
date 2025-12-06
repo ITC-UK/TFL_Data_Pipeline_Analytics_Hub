@@ -17,7 +17,6 @@ BASE_HDFS="/tmp/DE011025/TFL_Batch_processing/bronze"
 
 # TFL Lines List
 declare -a TFL_LINES=(
-  "bakerloo"
   "central"
   "metropolitan"
   "northern"
