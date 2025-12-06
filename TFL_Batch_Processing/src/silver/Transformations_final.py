@@ -13,19 +13,6 @@ from pyspark.sql.functions import (
 )
 from functools import reduce
 
-# ============================================================
-# HIVE BRONZE TABLES
-# ============================================================
-RAW_DB = "batchprocessing_tfl_db"
-
-raw_tables = {
-    "bakerloo":     "tfl_bakerloo_lines_raw",
-    "central":      "tfl_central_lines_raw",
-    "metropolitan": "tfl_metropolitan_lines_raw",
-    "northern":     "tfl_northern_lines_raw",
-    "piccadilly":   "tfl_piccadilly_lines_raw",
-    "victoria":     "tfl_victoria_lines_raw"
-}
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
 
 line_groups = [
