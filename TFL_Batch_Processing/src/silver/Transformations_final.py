@@ -51,61 +51,61 @@ SILVER_COLS = [
 COLUMN_LAYOUTS = {
 
     "bakerloo": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","direction","bearing",
         "destinationnaptanid","destinationname","timestamp_str",
         "timetostation","currentlocation","towards","expectedarrival",
-        "timetolive","modename","timing_type1",
+        "timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received","api_fetch_time"
     ],
 
     "central": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","direction","bearing",
         "destinationnaptanid","destinationname","timestamp_str",
         "timetostation","currentlocation","towards","expectedarrival",
-        "timetolive","modename","timing_type1",
+        "timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received","api_fetch_time"
     ],
 
     "metropolitan": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","bearing",
         "timestamp_str","timetostation","currentlocation","towards",
-        "expectedarrival","timetolive","modename","timing_type1",
+        "expectedarrival","timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received",
         "destinationnaptanid","destinationname","direction","api_fetch_time"
     ],
 
     "northern": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","direction","bearing",
         "destinationnaptanid","destinationname","timestamp_str",
         "timetostation","currentlocation","towards","expectedarrival",
-        "timetolive","modename","timing_type1",
+        "timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received","api_fetch_time"
     ],
 
     "piccadilly": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","direction","bearing",
         "destinationnaptanid","destinationname","timestamp_str",
         "timetostation","currentlocation","towards","expectedarrival",
-        "timetolive","modename","timing_type1",
+        "timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received","api_fetch_time"
     ],
 
     "victoria": [
-        "type","id","operationtype","vehicleid","naptanid","stationname",
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
         "lineid","linename","platformname","bearing",
         "destinationnaptanid","destinationname","timestamp_str",
         "timetostation","currentlocation","towards","expectedarrival",
-        "timetolive","modename","timing_type1",
+        "timetolive","modename","timing_type1","timing_type2",
         "timing_countdownserveradjustment","timing_source","timing_insert",
         "timing_read","timing_sent","timing_received",
         "direction","api_fetch_time"
