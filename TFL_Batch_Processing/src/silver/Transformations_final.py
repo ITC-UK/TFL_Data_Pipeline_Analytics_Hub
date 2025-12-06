@@ -20,7 +20,7 @@ from functools import reduce
 #  PATHS
 # ======================================================
 BRONZE_BASE = "hdfs:///tmp/DE011025/TFL_Batch_processing/bronze"
-SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
+SILVER_PATH = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental1"
 
 # ======================================================
 #  LINE GROUPS
@@ -197,7 +197,9 @@ for line_group in line_groups:
              col("timetostation").cast("int"))
         .otherwise(lit(None))
     )
-
+   df = df.withColumn("id", col("id").cast("bigint"))
+   df = df.withColumn("vehicleid", col("vehicleid").cast("int"))
+   df = df.withColumn("naptanid", col("naptanid").cast("string"))
     # Direction fill
     df = df.withColumn(
         "direction",
