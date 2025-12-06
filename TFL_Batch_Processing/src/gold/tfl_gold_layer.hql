@@ -1,6 +1,11 @@
 USE batchprocessing_tfl_db;
 
 CREATE EXTERNAL TABLE IF NOT EXISTS tfl_gold_table5 (
+    id BIGINT,
+    vehicleid INT,
+    naptanid STRING,
+    stationname STRING,
+    lineid STRING,
     linename STRING,
     platformname STRING,
     direction STRING,
