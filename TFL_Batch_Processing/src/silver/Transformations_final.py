@@ -23,6 +23,7 @@ line_groups = [
     "piccadilly",
     "victoria"
 ]
+
 silver_path = "hdfs:///tmp/DE011025/TFL_Batch_processing/tfl_silver_incremental"
 
 SILVER_COLS = [
@@ -31,7 +32,6 @@ SILVER_COLS = [
     "event_time","timetostation","currentlocation","towards",
     "expectedarrival_ts","train_type"
 ]
-cleaned_dfs = []
 
 def align_and_union(df1, df2):
     """Union two DataFrames with different schemas"""
@@ -50,6 +50,8 @@ spark = (
     .getOrCreate()
 )
 
+cleaned_dfs = []
+
 for line_group in line_groups:
     # Load ALL run_* folders, ANY part files inside
     path = f"{BRONZE_BASE}/TFL_{line_group}_lines/run_*/*"
@@ -63,6 +65,21 @@ for line_group in line_groups:
         .csv(path)
     )
 
+    # Rename columns automatically (Spark may generate col_0, col_1…)
+    # Read the first line of data to determine original CSV header length
+    # Your Bronze files ALWAYS have 30 columns so enforce consistent naming:
+    raw_cols = [
+        "type","type2","id","operationtype","vehicleid","naptanid","stationname",
+        "lineid","linename","platformname","direction","bearing","destinationnaptanid",
+        "destinationname","timestamp_str","timetostation","currentlocation","towards",
+        "expectedarrival","timetolive","modename","timing_type1","timing_type2",
+        "timing_countdownserveradjustment","timing_source","timing_insert",
+        "timing_read","timing_sent","timing_received","api_fetch_time"
+    ]
+
+    for i, colname in enumerate(df.columns):
+        df = df.withColumnRenamed(colname, raw_cols[i])
+
     # CLEAN STRING FIELDS
     df = (
         df.withColumn("stationname", trim(col("stationname")))
@@ -74,7 +91,7 @@ for line_group in line_groups:
           .withColumn("towards", trim(col("towards")))
     )
 
-    # TIMESTAMP FIXING
+     # ---------------- TIMESTAMPS ------------------
     df = df.withColumn(
     "event_time",
     when(
@@ -96,6 +113,8 @@ for line_group in line_groups:
             "yyyy-MM-dd'T'HH:mm:ss"
         )
     )
+
+
     # SAFE CAST
     df = df.withColumn(
         "timetostation",
