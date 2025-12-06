@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "========= UNIVERSAL INCREMENTAL INGESTION FOR ALL TFL LINES ========="
+echo "========= UNIVERSAL INCREMENTAL INGESTION (RAW OVERWRITE MODE) ========="
 
 # PostgreSQL CONFIG
 hostName="18.134.163.221"
@@ -13,7 +13,7 @@ HIVE_DATABASE="batchprocessing_tfl_db"
 HIVE_URL="jdbc:hive2://ip-172-31-14-3.eu-west-2.compute.internal:10000/${HIVE_DATABASE}"
 
 # HDFS Base Directory
-BASE_HDFS="/tmp/DE011025/TFL_Batch_processing/bronze"
+BASE_HDFS="/tmp/DE011025/TFL_Batch_processing/raw"
 
 # TFL Lines List
 declare -a TFL_LINES=(
@@ -28,7 +28,7 @@ declare -a TFL_LINES=(
 # LOOP THROUGH ALL LINES
 for LINE in "${TFL_LINES[@]}"; do
   echo ""
-  echo "Processing line: ${LINE}"
+  echo "Processing: ${LINE}"
 
   PG_TABLE="public.\"TFL_${LINE}_lines\""
   HIVE_TABLE="tfl_${LINE}_lines_raw"
@@ -42,15 +42,14 @@ for LINE in "${TFL_LINES[@]}"; do
   echo "HDFS path      : ${HDFS_PATH}"
   echo ""
 
-  # FETCH last api_fetch_time
-  echo "Fetching last API fetch timestamp from Hive..."
-
+  # FETCH last api_fetch_time from Hive
+  echo "Fetching last API timestamp..."
   LAST_TS=$(beeline -u "$HIVE_URL" --silent=true --outputformat=csv2 -e "
       USE ${HIVE_DATABASE};
       SELECT MAX(api_fetch_time) FROM ${HIVE_TABLE};
   " 2>/dev/null | tail -1)
 
-  echo "Last API fetch timestamp = ${LAST_TS}"
+  echo "Last API timestamp = ${LAST_TS}"
 
   # Build WHERE condition
   if [[ -z "$LAST_TS" || "$LAST_TS" == "NULL" ]]; then
@@ -61,9 +60,10 @@ for LINE in "${TFL_LINES[@]}"; do
       SQL_CONDITION="api_fetch_time > '${LAST_TS}'"
   fi
 
-  echo "Running Sqoop import with filter: ${SQL_CONDITION}"
+  echo "Cleaning HDFS output path..."
+  hdfs dfs -rm -r -f "${HDFS_PATH}" >/dev/null 2>&1
 
-  # RUN SQOOP
+  echo "Running Sqoop import..."
   sqoop import \
     --connect jdbc:postgresql://${hostName}:5432/${dbName} \
     --username ${userName} \
@@ -73,16 +73,15 @@ for LINE in "${TFL_LINES[@]}"; do
     --m 1 \
     --as-textfile
 
-  # CHECK STATUS
+  # Check status
   if [[ $? -eq 0 ]]; then
-      echo "SUCCESS → Sqoop import completed for ${LINE}"
-      echo "Data stored in: ${HDFS_PATH}"
+      echo "✔ SUCCESS → Sqoop import completed for ${LINE}"
+      echo "   Data stored in: ${HDFS_PATH}"
   else
-      echo "ERROR → Sqoop import FAILED for ${LINE}"
+      echo "❌ ERROR → Sqoop FAILED for ${LINE}"
       exit 1
   fi
 
 done
 
 echo "==================== ALL TFL LINES COMPLETED ===================="
-
