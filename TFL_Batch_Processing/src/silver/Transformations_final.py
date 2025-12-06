@@ -14,7 +14,7 @@ SILVER_COLS = [
     "event_time","timetostation","currentlocation","towards",
     "expectedarrival_ts","train_type"
 ]
-
+'''
 raw_cols = [
     "type","type2","id","operationtype","vehicleid","naptanid","stationname",
     "lineid","linename","platformname","direction","bearing",
@@ -25,6 +25,7 @@ raw_cols = [
     "timing_source","timing_insert","timing_read","timing_sent",
     "timing_received","api_fetch_time"
 ]
+'''
 
 def align_and_union(df1, df2):
     cols = list(set(df1.columns) | set(df2.columns))
@@ -45,8 +46,8 @@ for line_group in line_groups:
     df = spark.read.option("header","false").option("inferSchema","true").csv(path)
 
     # Rename raw CSV columns
-    for i, c in enumerate(df.columns):
-        df = df.withColumnRenamed(c, raw_cols[i])
+    #for i, c in enumerate(df.columns):
+        #df = df.withColumnRenamed(c, raw_cols[i])
 
     # Clean strings
     df = (
