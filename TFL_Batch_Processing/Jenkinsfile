@@ -16,7 +16,7 @@ pipeline {
                 '''
             }
         }
-
+        /*
         stage('1. Data Extraction from API') {
             steps {
                 echo "Running API data extraction (3 cycles)..."
@@ -65,7 +65,7 @@ pipeline {
             '''
         }
     }
-        /*
+    */
         stage('Run Silver Transformations') {
             steps {
                 echo "Running Silver layer Spark transformations..."
@@ -87,10 +87,11 @@ pipeline {
                 '''
             }
         }
-        */
+        
 
     }
 }
+
 
 
 
