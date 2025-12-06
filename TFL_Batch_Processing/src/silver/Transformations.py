@@ -47,12 +47,12 @@ spark = (
 RAW_DB = "batchprocessing_tfl_db"
 
 raw_tables = {
-    "bakerloo":     "tfl_bakerloo_lines_raw",
-    "central":      "tfl_central_lines_raw",
-    "metropolitan": "tfl_metropolitan_lines_raw",
-    "northern":     "tfl_northern_lines_raw",
-    "piccadilly":   "tfl_piccadilly_lines_raw",
-    "victoria":     "tfl_victoria_lines_raw"
+    "bakerloo":     "tfl_bakerloo_lines_bronze",
+    "central":      "tfl_central_lines_bronze",
+    "metropolitan": "tfl_metropolitan_lines_bronze",
+    "northern":     "tfl_northern_lines_bronze",
+    "piccadilly":   "tfl_piccadilly_lines_bronze",
+    "victoria":     "tfl_victoria_lines_bronze"
 }
 
 # ============================================================
