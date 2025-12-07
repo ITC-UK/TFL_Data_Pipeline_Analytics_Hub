@@ -22,35 +22,6 @@ declare -a TFL_LINES=(
   "piccadilly"
   "victoria"
 )
-
-# ------------------------------------------------------------
-# RETRY FUNCTION FOR SQOOP
-# ------------------------------------------------------------
-run_with_retry() {
-    local cmd="$1"
-    local attempts=3
-    local delay=30
-
-    for ((i=1; i<=attempts; i++)); do
-        echo "Attempt $i of $attempts..."
-        eval "$cmd"
-
-        if [[ $? -eq 0 ]]; then
-            echo "✔ Command succeeded on attempt $i"
-            return 0
-        fi
-
-        echo " Command failed on attempt $i"
-        if [[ $i -lt $attempts ]]; then
-            echo "⏳ Retrying in ${delay} seconds..."
-            sleep $delay
-        fi
-    done
-
-    echo "All retry attempts failed!"
-    return 1
-}
-
 # ------------------------------------------------------------
 # MAIN INGESTION LOOP
 # ------------------------------------------------------------
@@ -92,9 +63,6 @@ for LINE in "${TFL_LINES[@]}"; do
   echo "Cleaning HDFS output path..."
   hdfs dfs -rm -r -f "${HDFS_PATH}" >/dev/null 2>&1
 
-  # ---------------- RUN SQOOP WITH RETRY ----------------
-  echo "Running Sqoop import with retry..."
-
   SQOOP_CMD="sqoop import \
       --connect jdbc:postgresql://${hostName}:5432/${dbName} \
       --username ${userName} \
@@ -103,10 +71,7 @@ for LINE in "${TFL_LINES[@]}"; do
       --target-dir ${HDFS_PATH} \
       --m 1 \
       --as-textfile"
-
-  run_with_retry "$SQOOP_CMD"
-  STATUS=$?
-
+      
   # ---------------- CHECK STATUS ----------------
   if [[ $STATUS -eq 0 ]]; then
       echo "SUCCESS → Sqoop import completed for ${LINE}"
