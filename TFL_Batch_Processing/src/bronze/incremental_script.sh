@@ -22,6 +22,7 @@ declare -a TFL_LINES=(
   "piccadilly"
   "victoria"
 )
+
 # ------------------------------------------------------------
 # MAIN INGESTION LOOP
 # ------------------------------------------------------------
@@ -41,7 +42,7 @@ for LINE in "${TFL_LINES[@]}"; do
   echo "HDFS path      : ${HDFS_PATH}"
   echo ""
 
-  # ---------------- FETCH LAST TIMESTAMP FROM HIVE ----------------
+  # ---------------- FETCH LAST TIMESTAMP ----------------
   echo "Fetching last API timestamp from Hive..."
   LAST_TS=$(beeline -u "$HIVE_URL" --silent=true --outputformat=csv2 -e "
         USE ${HIVE_DATABASE};
@@ -50,7 +51,6 @@ for LINE in "${TFL_LINES[@]}"; do
 
   echo "Last API timestamp = ${LAST_TS}"
 
-  # ---------------- DETERMINE FULL OR INCREMENTAL ----------------
   if [[ -z "$LAST_TS" || "$LAST_TS" == "NULL" ]]; then
       echo "No previous data found → FULL LOAD"
       SQL_CONDITION="1=1"
@@ -59,25 +59,27 @@ for LINE in "${TFL_LINES[@]}"; do
       SQL_CONDITION="api_fetch_time > '${LAST_TS}'"
   fi
 
-  # ---------------- CLEAN OLD HDFS DIR ----------------
   echo "Cleaning HDFS output path..."
   hdfs dfs -rm -r -f "${HDFS_PATH}" >/dev/null 2>&1
 
-  SQOOP_CMD="sqoop import \
+  echo "Running Sqoop import..."
+  sqoop import \
       --connect jdbc:postgresql://${hostName}:5432/${dbName} \
       --username ${userName} \
       --password ${password} \
-      --query \"SELECT * FROM ${PG_TABLE} WHERE ${SQL_CONDITION} AND \\\$CONDITIONS\" \
+      --query "SELECT * FROM ${PG_TABLE} WHERE ${SQL_CONDITION} AND \$CONDITIONS" \
       --target-dir ${HDFS_PATH} \
       --m 1 \
-      --as-textfile"
-      
+      --as-textfile
+
+  STATUS=$?
+
   # ---------------- CHECK STATUS ----------------
   if [[ $STATUS -eq 0 ]]; then
       echo "SUCCESS → Sqoop import completed for ${LINE}"
       echo "   Data stored in: ${HDFS_PATH}"
   else
-      echo "FAILED → Sqoop import failed after retries for ${LINE}"
+      echo "FAILED → Sqoop import FAILED for ${LINE}"
       exit 1
   fi
 
