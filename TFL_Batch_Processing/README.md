@@ -47,8 +47,10 @@ This project demonstrates:
 - Composite-key deduplication  
 - Timestamp normalization  
 - Metadata enrichment  
-- Partitioning by lineGroup & lineName  
+- Partitioning by lineGroup & lineName
 
+### Data Modeling (Star Schema)
+![img](Images/datamodelling.png)
 
 ## Features & Integrations
 ### 6 Data Sources
