@@ -6,14 +6,20 @@ Kafka-based streaming pipeline for TFL real-time data.
 - Producer: Polls TFL APIs → enriches events → sends to Kafka.
 - Consumer: Spark Structured Streaming → reads Kafka → parses, deduplicates → writes to HDFS (Delta/Parquet).
 
+
+---
+![End-to-End Architecture](images/streaming_architecture.png)
 ---
 
 Project Structure:
 
 src/
 ├── producer.py
+
 ├── consumer.py
+
 ├── tests/
+
 config/dev.yaml
 data/
 
@@ -65,5 +71,5 @@ Notes:
 
 ---
 
-Author: Your Name
+Author: Lewis TWelftree
 Date: 2025-12-07
