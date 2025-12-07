@@ -13,6 +13,7 @@ import logging
 import signal
 import sys
 from typing import Dict, List
+import os
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -29,8 +30,11 @@ logging.basicConfig(
 logger = logging.getLogger("tfl-producer")
 
 # --- load config ---
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "dev.yaml")
+
 try:
-    with open("config/dev.yaml") as f:
+    with open(CONFIG_PATH) as f:
         cfg = yaml.safe_load(f)
     logger.info("Loaded config from config/dev.yaml")
 except Exception as e:
