@@ -89,12 +89,7 @@ def parse_and_flatten(df):
     flat = flat.withColumn("year", year(col("_ingest_ts")))
     flat = flat.withColumn("month", month(col("_ingest_ts")))
     flat = flat.withColumn("day", dayofmonth(col("_ingest_ts")))
-
     return flat
-
-# ------------------------------------------------------------------------------------------
-# NEW OVERWRITE IMPLEMENTATIONS
-# ------------------------------------------------------------------------------------------
 
 def write_using_delta_overwrite(df, target_path):
     """Overwrite entire Delta table with latest snapshot."""
@@ -116,10 +111,6 @@ def write_using_parquet_overwrite(df, target_path):
     except Exception as e:
         logger.error(f"Parquet overwrite FAILED: {e}")
         raise
-
-# ------------------------------------------------------------------------------------------
-# foreachBatch logic
-# ------------------------------------------------------------------------------------------
 
 def foreach_batch_function(batch_df, batch_id):
     logger.info(f"Processing batch {batch_id} - count={batch_df.count()}")
@@ -152,12 +143,7 @@ def foreach_batch_function(batch_df, batch_id):
 
     logger.info(f"Finished processing batch {batch_id}")
 
-# ------------------------------------------------------------------------------------------
-# Main
-# ------------------------------------------------------------------------------------------
-
-# # Commented version for continuous streaming with trigger(processingTime)
-# def main():
+# def main(): # streaming with trigger(processingTime)
 #     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
 #     query = (
 #         raw_json_df.writeStream
@@ -169,17 +155,14 @@ def foreach_batch_function(batch_df, batch_id):
 #     logger.info(f"Started streaming query with checkpoint={CHECKPOINT_PATH}")
 #     query.awaitTermination()
 
-def main():
+def main(): # batch
     raw_json_df = kafka_df.selectExpr("CAST(value AS STRING) AS json_value")
-
     query = (
         raw_json_df.writeStream
         .foreachBatch(foreach_batch_function)
         .option("checkpointLocation", CHECKPOINT_PATH)
         .trigger(once=True)
-        .start()
-    )
-
+        .start())
     logger.info(f"Streaming job started. Checkpoint={CHECKPOINT_PATH}")
     query.awaitTermination()
 

@@ -1,121 +1,96 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from pyspark.sql import Row
-
 import sys
 import os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import consumer
+import producer
 
-from consumer import (
-    get_tfl_schema,
-    parse_json,
-    filter_valid,
-    explode_events,
-    write_output,
-    process_batch,
-)
 
+# --------------------------------------------------------------------------
+# Fixtures
+# --------------------------------------------------------------------------
 
 @pytest.fixture
-def mock_spark(monkeypatch):
-    """Return a mocked SparkSession to avoid starting a real JVM."""
-    spark = MagicMock()
-    spark.createDataFrame.side_effect = lambda data, schema=None: MagicMock(
-        count=MagicMock(return_value=len(data)),
-        collect=MagicMock(return_value=data),
-        columns=[col for col in data[0].__dict__.keys()] if data else [],
-        write=MagicMock()
-    )
-    monkeypatch.setattr(consumer, "spark", spark)
-    return spark
+def sample_events():
+    """Return a sample list of TFL events."""
+    return [{"id": "1", "destinationName": "Station"}]
 
 
-def test_get_tfl_schema_returns_array_of_struct():
-    # Explanation:
-    # Ensures the schema returned matches the expected top-level ArrayType.
-    schema = get_tfl_schema()
-    assert schema.typeName() == "array"
-    assert schema.elementType.typeName() == "struct"
-    assert len(schema.elementType.fields) == 19
+# --------------------------------------------------------------------------
+# Tests
+# --------------------------------------------------------------------------
+
+def test_create_producer_returns_kafka_producer(monkeypatch):
+    """Ensure create_producer returns a KafkaProducer instance with correct serializers."""
+    mock_kafka = MagicMock()
+    monkeypatch.setattr(producer, "KafkaProducer", mock_kafka)
+
+    kafka = producer.create_producer(["localhost:9092"])
+    assert kafka == mock_kafka.return_value
+
+    # Verify serializers
+    vs = mock_kafka.call_args.kwargs["value_serializer"]
+    ks = mock_kafka.call_args.kwargs["key_serializer"]
+    assert vs({"a": 1}) == b'{"a": 1}'
+    assert ks("key") == b"key"
 
 
-def test_parse_json_parses_valid_json(mock_spark):
-    # Explanation:
-    # Verifies that valid JSON is parsed into a "data" column following the schema.
-    schema = get_tfl_schema()
-    json_df = MagicMock()
-    json_df.columns = ["json_value"]
-    parsed = parse_json(json_df, schema)
-    # Since parse_json may produce a DataFrame, we just check column exists
-    assert hasattr(parsed, "columns") or isinstance(parsed, MagicMock)
+def test_fetch_tfl_data_returns_json():
+    """Verify fetch_tfl_data calls session.get and returns parsed JSON."""
+    mock_session = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"ok": True}
+    mock_session.get.return_value = mock_resp
+
+    result = producer.fetch_tfl_data(mock_session, "http://api", "APP", "KEY")
+    assert result == {"ok": True}
+    mock_session.get.assert_called_once()
+    mock_resp.raise_for_status.assert_called_once()
 
 
-def test_filter_valid_removes_null_data(mock_spark):
-    # Explanation:
-    # Ensures rows where "data" is null are dropped.
-    df = [
-        Row(data=None),
-        Row(data={"id": "1"})
-    ]
-    # patch filter_valid to return only valid rows
-    filtered = filter_valid(df)
-    assert all(row.data is not None for row in filtered)
+def test_enrich_events_adds_line_metadata():
+    """Ensure enrich_events adds line metadata and converts IDs to strings."""
+    events = [{"id": 5}, {"id": "7"}]
+    enriched = producer.enrich_events(events, "central")
+
+    for event in enriched:
+        assert event["line"] == "central"
+        assert isinstance(event["id"], str)
 
 
-def test_explode_events_expands_array_to_rows(mock_spark):
-    # Explanation:
-    # Confirms explode_events takes an array column and outputs one row per element.
-    df = [
-        Row(data=[{"id": "1"}, {"id": "2"}])
-    ]
-    exploded = explode_events(df)
-    ids = [row["id"] if isinstance(row, dict) else row.data[0]["id"] for row in exploded]
-    # Expecting two IDs
-    assert "1" in ids and "2" in ids
+def test_send_events_calls_producer_methods():
+    """Verify send_events calls producer.send for each event and flushes."""
+    mock_producer = MagicMock()
+    events = [{"id": "1"}, {"id": "2"}]
+
+    sent_count = producer.send_events(mock_producer, "topic", events)
+    assert sent_count == 2
+    assert mock_producer.send.call_count == 2
+    mock_producer.flush.assert_called_once()
 
 
-def test_write_output_writes_parquet(monkeypatch, tmp_path):
-    # Explanation:
-    # Ensures write_output triggers a parquet write by intercepting the Spark write call.
-    captured = {}
+@patch("producer.fetch_tfl_data")
+@patch("producer.send_events")
+def test_poll_and_send_once_invokes_pipeline(mock_send, mock_fetch):
+    """Ensure poll_and_send_once fetches, enriches, and sends events via Kafka."""
+    mock_fetch.return_value = [{"id": "1"}]
+    mock_send.return_value = 1
+    mock_producer = MagicMock()
+    api_list = {"victoria": "http://api/vic"}
 
-    class MockWriter:
-        def mode(self, mode):
-            return self
-        def parquet(self, path):
-            captured["path"] = path
+    total = producer.poll_and_send_once(mock_producer, api_list, "APP", "KEY", MagicMock())
 
-    def fake_writer(df):
-        return MockWriter()
-
-    df = MagicMock()
-    monkeypatch.setattr(df, "write", fake_writer(df))
-    write_output(df, str(tmp_path))
-    assert captured["path"] == str(tmp_path)
+    mock_fetch.assert_called_once()
+    mock_send.assert_called_once()
+    enriched_events = mock_send.call_args[0][2]
+    assert enriched_events[0]["line"] == "victoria"
+    assert total == 1
 
 
-def test_process_batch_executes_pipeline(monkeypatch, mock_spark, tmp_path):
-    # Explanation:
-    # Verifies process_batch calls filter, explode, and write in sequence by mocking write_output.
-    calls = {"write_called": False}
-
-    def mock_write(df, path):
-        calls["write_called"] = True
-        calls["path"] = path
-        calls["df_count"] = len(df) if isinstance(df, list) else getattr(df, "count", lambda: 1)()
-
-    monkeypatch.setattr("consumer.write_output", mock_write)
-
-    df = [
-        Row(json_value='[{ "id": "1" }]')
-    ]
-
-    # Prepare schema and parse JSON first because process_batch expects parsed structure
-    parsed = parse_json(df, get_tfl_schema())
-
-    process_batch(parsed, batch_id=1, output_path=str(tmp_path))
-
-    assert calls["write_called"] is True
-    assert calls["df_count"] >= 1
-    assert calls["path"] == str(tmp_path)
+def test_shutdown_closes_producer():
+    """Verify shutdown flushes and closes the Kafka producer."""
+    mock_prod = MagicMock()
+    producer.shutdown(mock_prod)
+    mock_prod.flush.assert_called_once()
+    mock_prod.close.assert_called_once()
