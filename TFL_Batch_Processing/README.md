@@ -157,7 +157,6 @@ The entire TFL Batch Pipeline is automated using Jenkins to ensure reliable and 
 - **Cron-based scheduling** to refresh data at regular intervals  
 - **Stage isolation**: if one stage fails, others are not affected   
 - **Automatic partition repair** using  
-  ```sql
   MSCK REPAIR TABLE table_name;
 
 - GitHub Integration: Jenkins always pulls the latest version of the scripts
