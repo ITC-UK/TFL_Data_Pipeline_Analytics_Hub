@@ -1,7 +1,7 @@
 # Data processing
 pandas>=2.0.0
 
-# HTTP requests
+# HTTP requests (TFL API extraction)
 requests>=2.31.0
 
 # PostgreSQL connectivity
@@ -11,12 +11,22 @@ sqlalchemy>=2.0.0
 # Environment variables management
 python-dotenv>=1.2.1
 
-# Optional: Hive connectivity via PyHive (if using Hive/HQL)
+# Spark for Silver-layer transformations
+pyspark>=3.4.0
+pyarrow>=14.0.0  # Optional but recommended for better performance
+
+# Optional: Hive connectivity via PyHive
 pyhive>=0.6.3
 thrift>=0.19.0
 
-# Optional: For scheduling tasks in Python
+# Optional: Task scheduling
 schedule>=1.2.0
 
 # Optional: Date handling
 python-dateutil>=2.9.2
+
+# Optional: Logging enhancement
+loguru>=0.7.0
+
+# Optional: HDFS file operations
+hdfs>=2.7.0
