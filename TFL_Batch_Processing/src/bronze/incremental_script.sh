@@ -110,7 +110,7 @@ for LINE in "${TFL_LINES[@]}"; do
 
   # ---------------- CHECK STATUS ----------------
   if [[ $STATUS -eq 0 ]]; then
-      echo "✔ SUCCESS → Sqoop import completed for ${LINE}"
+      echo "SUCCESS → Sqoop import completed for ${LINE}"
       echo "   Data stored in: ${HDFS_PATH}"
   else
       echo "FAILED → Sqoop import failed after retries for ${LINE}"
